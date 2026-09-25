@@ -1,0 +1,25 @@
+From: Security Team <security@example.com>
+To: user@example.com
+Subject: Test Suspicious Attachment
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <suspicious-attachment-test@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUNDARY456"
+
+--BOUNDARY456
+Content-Type: text/plain; charset="UTF-8"
+
+Hello User,
+
+This is a safe test for attachment detection.
+
+Please review the attached document.
+
+--BOUNDARY456
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="invoice.pdf.exe"
+Content-Transfer-Encoding: base64
+
+SGVsbG8gZnJvbSB0aGUgc2FmZSBhdHRhY2htZW50IHRlc3Qu
+
+--BOUNDARY456--

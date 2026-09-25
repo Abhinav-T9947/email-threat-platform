@@ -1,0 +1,28 @@
+From: Security Team <security@example.com>
+To: user@example.com
+Subject: Urgent Account Verification
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <url-threat-test@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Dear User,
+
+We detected unusual activity on your account.
+
+Please verify your account immediately using the following links:
+
+http://192.0.2.10/login
+
+https://xn--pple-43d.example/login
+
+https://sub.one.two.example.com/login
+
+https://this-is-a-very-long-domain-name-that-should-trigger-the-domain-length-check.example/login
+
+https://example.com/login?user%3Dadmin
+
+Failure to verify your account may result in suspension.
+
+Regards,
+Security Team

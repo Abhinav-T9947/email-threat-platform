@@ -1,0 +1,18 @@
+From: Security Team [security@example.com](mailto:security@example.com)
+To: [user@example.com](mailto:user@example.com)
+Subject: Authentication Pass Test
+Date: Tue, 23 Sep 2026 22:00:00 +0530
+Message-ID: [authentication-pass-test@example.com](mailto:authentication-pass-test@example.com)
+Return-Path: [security@example.com](mailto:security@example.com)
+Authentication-Results: mail.example.com; spf=pass smtp.mailfrom=example.com; dkim=pass header.d=example.com; dmarc=pass header.from=example.com
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Hello User,
+
+This is a safe authentication test email.
+
+No action is required.
+
+Regards,
+Security Team

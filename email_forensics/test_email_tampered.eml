@@ -1,0 +1,25 @@
+From: Security Team <security@example.com>
+To: user@example.com
+Subject: Urgent Account Verification Required
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <test-12345@example.com>
+Return-Path: <alerts@fake-security.example>
+Reply-To: support@fake-security.example
+Received: from mail.fake-security.example (mail.fake-security.example [203.0.113.25]) by mail.example.com with ESMTP; Tue, 22 Sep 2026 21:29:58 +0530
+Received: from unknown (unknown [198.51.100.42]) by mail.fake-security.example with ESMTP; Tue, 22 Sep 2026 21:29:55 +0530
+Authentication-Results: mail.example.com; spf=fail smtp.mailfrom=fake-security.example; dkim=fail d=fake-security.example; dmarc=fail header.from=example.com
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Dear Customer,
+
+We detected unusual activity on your account.
+
+Please verify your account immediately by visiting:
+
+http://example.com/verify
+
+Failure to verify your account within 24 hours may result in suspension.
+
+Regards,
+Security Team

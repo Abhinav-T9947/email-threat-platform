@@ -1,0 +1,17 @@
+From: Security Team <security@example.com>
+To: user@example.com
+Subject: Geolocation Test Email
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <geolocation-test@example.com>
+Received: from dns.google (dns.google [8.8.8.8]) by mail.example.com with ESMTP; Tue, 22 Sep 2026 21:29:58 +0530
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Hello User,
+
+This is a safe test email for IP geolocation.
+
+The test IP address is 8.8.8.8.
+
+Regards,
+Security Team

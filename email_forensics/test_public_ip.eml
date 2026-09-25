@@ -1,0 +1,15 @@
+From: Test Sender <sender@example.com>
+To: user@example.com
+Subject: Public IP Intelligence Test
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <public-ip-test@example.com>
+Received: from test.example.com (test.example.com [8.8.8.8]) by mail.example.com with ESMTP; Tue, 22 Sep 2026 21:29:58 +0530
+MIME-Version: 1.0
+Content-Type: text/plain; charset="UTF-8"
+
+Hello,
+
+This is a safe test of public IP intelligence.
+
+Regards,
+Test Sender

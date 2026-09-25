@@ -1,0 +1,23 @@
+From: Security Team <security@example.com>
+To: user@example.com
+Subject: Test Email With Attachment
+Date: Tue, 22 Sep 2026 21:30:00 +0530
+Message-ID: <attachment-test@example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUNDARY123"
+
+--BOUNDARY123
+Content-Type: text/plain; charset="UTF-8"
+
+Hello User,
+
+This is a safe attachment analysis test.
+
+--BOUNDARY123
+Content-Type: text/plain; name="invoice.txt"
+Content-Disposition: attachment; filename="invoice.txt"
+Content-Transfer-Encoding: base64
+
+SGVsbG8gZnJvbSB0aGUgZW1haWwgdGhyZWF0IHBsYXRmb3JtLg==
+
+--BOUNDARY123--

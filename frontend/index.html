@@ -1,0 +1,3447 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Email Threat Detection & Forensics v2.0</title>
+
+<style>
+
+    * {
+        box-sizing: border-box;
+    }
+
+    body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f4f6f8;
+        color: #1f2937;
+    }
+
+    header {
+        background: #111827;
+        color: white;
+        padding: 20px 30px;
+    }
+
+    header h1 {
+        margin: 0;
+        font-size: 24px;
+    }
+
+    header p {
+        margin: 6px 0 0;
+        color: #d1d5db;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 30px auto;
+        padding: 0 20px;
+    }
+
+    .card {
+        background: white;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    }
+
+    .card h2 {
+        margin-top: 0;
+        font-size: 20px;
+    }
+
+    .upload-area {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+
+    input[type="file"] {
+        padding: 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+    }
+
+    input[type="text"] {
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #d1d5db;
+        border-radius: 8px;
+        margin-top: 6px;
+    }
+
+    button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        padding: 11px 20px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 15px;
+    }
+
+    button:hover {
+        background: #1d4ed8;
+    }
+
+    button:disabled {
+        background: #9ca3af;
+        cursor: not-allowed;
+    }
+
+    .message {
+        margin-top: 15px;
+        padding: 12px;
+        border-radius: 8px;
+        display: none;
+    }
+
+    .message.success {
+        display: block;
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .message.error {
+        display: block;
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .overview-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 15px;
+    }
+
+    .metric {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 18px;
+    }
+
+    .metric-title {
+        font-size: 13px;
+        color: #6b7280;
+        margin-bottom: 8px;
+    }
+
+    .metric-value {
+        font-size: 24px;
+        font-weight: bold;
+    }
+
+    .risk-high {
+        color: #dc2626;
+    }
+
+    .risk-medium {
+        color: #d97706;
+    }
+
+    .risk-low {
+        color: #16a34a;
+    }
+
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 12px;
+    }
+
+    .info-item {
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 12px;
+    }
+
+    .info-label {
+        font-size: 12px;
+        color: #6b7280;
+        margin-bottom: 5px;
+    }
+
+    .info-value {
+        font-weight: 600;
+        word-break: break-word;
+    }
+
+    .status-pass {
+        color: #16a34a;
+        font-weight: bold;
+    }
+
+    .status-fail {
+        color: #dc2626;
+        font-weight: bold;
+    }
+
+    .status-unknown {
+        color: #6b7280;
+        font-weight: bold;
+    }
+
+    .status-warning {
+        color: #d97706;
+        font-weight: bold;
+    }
+
+    .auth-note,
+    .sender-note {
+        margin-top: 15px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        color: #4b5563;
+        font-size: 14px;
+    }
+
+    .integrity-card {
+        border: 1px solid #bfdbfe;
+        background: linear-gradient(
+            135deg,
+            #eff6ff,
+            #ffffff
+        );
+    }
+
+    .integrity-status {
+        margin-bottom: 18px;
+        padding: 15px;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+    }
+
+    .integrity-verified {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+    }
+
+    .integrity-mismatch {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+    }
+
+    .hash-value {
+        font-family: Consolas, Monaco, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        word-break: break-all;
+    }
+
+    .blockchain-note {
+        margin-top: 15px;
+        padding: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        color: #4b5563;
+        font-size: 14px;
+    }
+
+    .ip-card,
+    .url-card,
+    .attachment-card,
+    .relay-card,
+    .reason-card {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 12px;
+        background: #fafafa;
+    }
+
+    .ip-card:last-child,
+    .url-card:last-child,
+    .attachment-card:last-child,
+    .relay-card:last-child,
+    .reason-card:last-child {
+        margin-bottom: 0;
+    }
+
+    .ip-title,
+    .url-value,
+    .attachment-title {
+        font-weight: bold;
+        word-break: break-word;
+        margin-bottom: 12px;
+    }
+
+    .url-value {
+        color: #1d4ed8;
+    }
+
+    .url-details,
+    .attachment-details,
+    .relay-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+
+    .url-details div,
+    .attachment-details div,
+    .relay-details div {
+        font-size: 14px;
+    }
+
+    .badges {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+    }
+
+    .badge {
+        display: inline-block;
+        padding: 5px 9px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: bold;
+        margin: 3px;
+    }
+
+    .badge.danger {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .badge.warning {
+        background: #fef3c7;
+        color: #92400e;
+    }
+
+    .badge.safe {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .badge.info {
+        background: #dbeafe;
+        color: #1e40af;
+    }
+
+    .map-link {
+        display: inline-block;
+        margin-top: 10px;
+        color: #2563eb;
+        text-decoration: none;
+        font-weight: bold;
+    }
+
+    .map-link:hover {
+        text-decoration: underline;
+    }
+
+    .empty-state {
+        color: #6b7280;
+        padding: 10px 0;
+    }
+
+    .reason-list {
+        margin: 0;
+        padding-left: 20px;
+    }
+
+    .reason-list li {
+        margin-bottom: 8px;
+    }
+
+    .domain-intelligence {
+        margin-top: 15px;
+        padding: 14px;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+        border-radius: 10px;
+    }
+
+    .domain-intelligence-title {
+        font-weight: bold;
+        margin-bottom: 10px;
+        color: #1e3a8a;
+    }
+
+    .domain-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 8px;
+    }
+
+    .domain-item {
+        background: white;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 13px;
+    }
+
+    details {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        background: #fafafa;
+    }
+
+    details summary {
+        cursor: pointer;
+        padding: 15px;
+        font-weight: bold;
+        user-select: none;
+    }
+
+    details summary:hover {
+        background: #f3f4f6;
+    }
+
+
+    /* =========================================================
+       MANUAL BLOCKCHAIN VERIFICATION DROPDOWN
+    ========================================================= */
+
+    .manual-verification-dropdown {
+        margin-bottom: 20px;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+        overflow: hidden;
+    }
+
+    .manual-verification-dropdown summary {
+        cursor: pointer;
+        padding: 20px;
+        font-size: 20px;
+        font-weight: bold;
+        user-select: none;
+        list-style: none;
+        background: white;
+    }
+
+    .manual-verification-dropdown summary::-webkit-details-marker {
+        display: none;
+    }
+
+    .manual-verification-dropdown summary::after {
+        content: "▸";
+        float: right;
+        font-size: 18px;
+        transition: transform 0.2s ease;
+    }
+
+    .manual-verification-dropdown[open] summary::after {
+        content: "▾";
+    }
+
+    .manual-verification-dropdown summary:hover {
+        background: #f9fafb;
+    }
+
+    .manual-verification-content {
+        padding: 0 20px 20px 20px;
+        border-top: 1px solid #e5e7eb;
+    }
+
+    pre {
+        margin: 0;
+        padding: 15px;
+        overflow-x: auto;
+        background: #111827;
+        color: #e5e7eb;
+        border-radius: 0 0 10px 10px;
+        font-size: 12px;
+        line-height: 1.5;
+    }
+
+    .loading {
+        display: none;
+        margin-top: 15px;
+        color: #2563eb;
+        font-weight: bold;
+    }
+
+    footer {
+        text-align: center;
+        padding: 30px;
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+    @media (max-width: 600px) {
+
+        header {
+            padding: 18px;
+        }
+
+        .container {
+            padding: 0 12px;
+        }
+
+        .card {
+            padding: 15px;
+        }
+
+    }
+
+</style>
+
+</head>
+
+<body>
+
+<header>
+
+    <h1>🛡️ Email Threat Detection & Forensics</h1>
+
+    <p>
+        Analyze email messages for phishing, authentication failures,
+        suspicious URLs, attachments and infrastructure indicators.
+    </p>
+
+</header>
+
+<div class="container">
+
+    <!-- Upload -->
+
+    <div class="card">
+
+        <h2>📧 Analyze Email</h2>
+
+        <div class="upload-area">
+
+            <input
+                type="file"
+                id="emailFile"
+                accept=".eml"
+            >
+
+            <button
+                type="button"
+                id="analyzeButton"
+                onclick="analyzeEmail()"
+            >
+                Analyze Email
+            </button>
+
+        </div>
+
+        <div
+            id="selectedFileName"
+            style="margin-top: 10px; color: #374151; font-size: 14px;"
+        >
+            No email file selected.
+        </div>
+
+        <div id="loading" class="loading">
+            ⏳ Analyzing email...
+        </div>
+
+        <div id="message" class="message"></div>
+
+    </div>
+
+
+    <!-- Threat Overview -->
+
+    <div class="card">
+
+        <h2>🚨 Threat Overview</h2>
+
+        <div class="overview-grid">
+
+            <div class="metric">
+                <div class="metric-title">
+                    Threat Score
+                </div>
+
+                <div
+                    id="threatScore"
+                    class="metric-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    Risk Level
+                </div>
+
+                <div
+                    id="riskLevel"
+                    class="metric-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    ML Prediction
+                </div>
+
+                <div
+                    id="mlPrediction"
+                    class="metric-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    Phishing Probability
+                </div>
+
+                <div
+                    id="phishingProbability"
+                    class="metric-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    URLs
+                </div>
+
+                <div
+                    id="urlCount"
+                    class="metric-value"
+                >
+                    0
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    Attachments
+                </div>
+
+                <div
+                    id="attachmentCount"
+                    class="metric-value"
+                >
+                    0
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    IP Addresses
+                </div>
+
+                <div
+                    id="ipCount"
+                    class="metric-value"
+                >
+                    0
+                </div>
+            </div>
+
+            <div class="metric">
+                <div class="metric-title">
+                    Relay Hops
+                </div>
+
+                <div
+                    id="relayCount"
+                    class="metric-value"
+                >
+                    0
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Evidence Integrity & Blockchain -->
+
+    <div class="card integrity-card">
+
+        <h2>🔐 Evidence Integrity & Blockchain Verification</h2>
+
+        <div
+            id="integrityStatus"
+            class="integrity-status integrity-verified"
+        >
+            Blockchain verification pending...
+        </div>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <div class="info-label">Case ID</div>
+
+                <div
+                    id="caseId"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Hash Algorithm</div>
+
+                <div
+                    id="hashAlgorithm"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Block Number</div>
+
+                <div
+                    id="blockNumber"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Evidence Match</div>
+
+                <div
+                    id="evidenceMatch"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Report Match</div>
+
+                <div
+                    id="reportMatch"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">Created At</div>
+
+                <div
+                    id="integrityCreatedAt"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+        </div>
+
+        <div
+            class="info-item"
+            style="margin-top: 12px;"
+        >
+            <div class="info-label">
+                Evidence SHA-256
+            </div>
+
+            <div
+                id="evidenceSha256"
+                class="info-value hash-value"
+            >
+                -
+            </div>
+        </div>
+
+        <div
+            class="info-item"
+            style="margin-top: 12px;"
+        >
+            <div class="info-label">
+                Report SHA-256
+            </div>
+
+            <div
+                id="reportSha256"
+                class="info-value hash-value"
+            >
+                -
+            </div>
+        </div>
+
+        <div
+            class="info-item"
+            style="margin-top: 12px;"
+        >
+            <div class="info-label">
+                Blockchain Transaction Hash
+            </div>
+
+            <div
+                id="transactionHash"
+                class="info-value hash-value"
+            >
+                -
+            </div>
+        </div>
+
+        <div class="blockchain-note">
+
+            🔒 <strong>Forensic integrity:</strong>
+            the original email is not stored on the blockchain.
+            The blockchain stores cryptographic integrity metadata
+            that can be used to verify whether the evidence and
+            forensic report hashes match the recorded values.
+
+        </div>
+
+    </div>
+
+
+    <!-- Manual Blockchain Verification -->
+
+    <details class="manual-verification-dropdown">
+
+        <summary>
+            🔍 Manual Blockchain Integrity Verification
+        </summary>
+
+        <div class="manual-verification-content">
+
+            <div class="blockchain-note">
+
+                Enter the blockchain transaction details below to
+                independently verify the integrity of the forensic
+                evidence and report.
+
+            </div>
+
+            <div style="margin-top: 15px;">
+
+                <div class="info-label">
+                    Blockchain Transaction Hash
+                </div>
+
+                <input
+                    type="text"
+                    id="verifyTransactionHash"
+                    placeholder="Enter blockchain transaction hash"
+                >
+
+            </div>
+
+            <div style="margin-top: 15px;">
+
+                <div class="info-label">
+                    Evidence SHA-256
+                </div>
+
+                <input
+                    type="text"
+                    id="verifyEvidenceHash"
+                    placeholder="Enter evidence SHA-256"
+                >
+
+            </div>
+
+            <div style="margin-top: 15px;">
+
+                <div class="info-label">
+                    Report SHA-256
+                </div>
+
+                <input
+                    type="text"
+                    id="verifyReportHash"
+                    placeholder="Enter forensic report SHA-256"
+                >
+
+            </div>
+
+            <!-- IMPORTANT: type="button" prevents navigation/submission -->
+
+            <button
+                type="button"
+                id="verifyIntegrityButton"
+                onclick="verifyBlockchainIntegrity(event)"
+                style="margin-top: 18px;"
+            >
+                🔍 Verify Integrity
+            </button>
+
+            <div
+                id="manualVerificationResult"
+                style="margin-top: 20px;"
+            ></div>
+
+        </div>
+
+    </details>
+
+
+    <!-- Authentication -->
+
+    <div class="card">
+
+        <h2>🔐 Email Authentication</h2>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <div class="info-label">
+                    SPF
+                </div>
+
+                <div
+                    id="spfStatus"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    DKIM
+                </div>
+
+                <div
+                    id="dkimStatus"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    DMARC
+                </div>
+
+                <div
+                    id="dmarcStatus"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+        </div>
+
+        <div class="auth-note">
+
+            ℹ️ <strong>Unknown</strong> means the email did not contain
+            a usable Authentication-Results header for that check.
+            It does not mean the authentication failed.
+
+        </div>
+
+    </div>
+
+
+    <!-- Email Information -->
+
+    <div class="card">
+
+        <h2>✉️ Email Information</h2>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <div class="info-label">
+                    From
+                </div>
+
+                <div
+                    id="emailFrom"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    To
+                </div>
+
+                <div
+                    id="emailTo"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Subject
+                </div>
+
+                <div
+                    id="emailSubject"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Date
+                </div>
+
+                <div
+                    id="emailDate"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Message ID
+                </div>
+
+                <div
+                    id="messageId"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Return Path
+                </div>
+
+                <div
+                    id="returnPath"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Reply To
+                </div>
+
+                <div
+                    id="replyTo"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Sender Analysis -->
+
+    <div class="card">
+
+        <h2>👤 Sender Analysis</h2>
+
+        <div class="info-grid">
+
+            <div class="info-item">
+                <div class="info-label">
+                    Visible From Domain
+                </div>
+
+                <div
+                    id="senderFromDomain"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Return-Path Domain
+                </div>
+
+                <div
+                    id="senderReturnPathDomain"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Reply-To Domain
+                </div>
+
+                <div
+                    id="senderReplyToDomain"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Return-Path Domain Match
+                </div>
+
+                <div
+                    id="returnPathMatch"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+            <div class="info-item">
+                <div class="info-label">
+                    Reply-To Domain Match
+                </div>
+
+                <div
+                    id="replyToMatch"
+                    class="info-value"
+                >
+                    -
+                </div>
+            </div>
+
+        </div>
+
+        <div class="sender-note">
+
+            ℹ️ Sender mismatch checks compare the visible From domain
+            with the Return-Path and Reply-To domains. A mismatch is
+            an indicator for investigation and does not by itself prove
+            that an email is malicious.
+
+        </div>
+
+    </div>
+
+
+    <!-- IP Intelligence -->
+
+    <div class="card">
+
+        <h2>🌍 IP Intelligence & Geolocation</h2>
+
+        <div id="ipIntelligence">
+
+            <div class="empty-state">
+                No IP information available.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- URL Intelligence -->
+
+    <div class="card">
+
+        <h2>🔗 URL Intelligence</h2>
+
+        <div id="urlIntelligence">
+
+            <div class="empty-state">
+                No URLs found.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Relay Analysis -->
+
+    <div class="card">
+
+        <h2>📡 Relay Analysis</h2>
+
+        <div id="relayAnalysis">
+
+            <div class="empty-state">
+                No relay information available.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Attachments -->
+
+    <div class="card">
+
+        <h2>📎 Attachment Intelligence</h2>
+
+        <div id="attachmentIntelligence">
+
+            <div class="empty-state">
+                No attachments found.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Threat Indicators -->
+
+    <div class="card">
+
+        <h2>⚠️ Threat Indicators</h2>
+
+        <div id="threatIndicators">
+
+            <div class="empty-state">
+                No threat indicators available.
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Raw Result -->
+
+    <div class="card">
+
+        <details>
+
+            <summary>
+                🧾 Raw Forensic Result
+            </summary>
+
+            <pre id="rawResult">No analysis performed yet.</pre>
+
+        </details>
+
+    </div>
+
+</div>
+
+
+<footer>
+
+    Email Threat Detection & Forensics Platform
+
+</footer>
+
+
+<script>
+
+const API_URL = "http://127.0.0.1:8000";
+
+console.log(
+    "EMAIL THREAT PLATFORM FRONTEND v2.1 LOADED"
+);
+
+
+/* =========================================================
+   FILE SELECTION
+========================================================= */
+
+document.addEventListener(
+    "DOMContentLoaded",
+    function () {
+
+        const fileInput =
+            document.getElementById(
+                "emailFile"
+            );
+
+        const selectedFileName =
+            document.getElementById(
+                "selectedFileName"
+            );
+
+        if (
+            fileInput &&
+            selectedFileName
+        ) {
+
+            fileInput.addEventListener(
+                "change",
+                function () {
+
+                    if (
+                        this.files &&
+                        this.files.length > 0
+                    ) {
+
+                        selectedFileName.textContent =
+                            "Selected file: " +
+                            this.files[0].name;
+
+                    } else {
+
+                        selectedFileName.textContent =
+                            "No email file selected.";
+
+                    }
+
+                }
+            );
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   UTILITY FUNCTIONS
+========================================================= */
+
+function escapeHtml(value) {
+
+    return String(
+        value ?? ""
+    )
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
+
+
+function setMessage(
+    message,
+    type
+) {
+
+    const element =
+        document.getElementById(
+            "message"
+        );
+
+    element.textContent =
+        message;
+
+    element.className =
+        "message " + type;
+
+}
+
+
+function clearMessage() {
+
+    const element =
+        document.getElementById(
+            "message"
+        );
+
+    element.textContent =
+        "";
+
+    element.className =
+        "message";
+
+}
+
+
+function formatPercentage(
+    value
+) {
+
+    if (
+        value === null ||
+        value === undefined ||
+        Number.isNaN(
+            Number(value)
+        )
+    ) {
+
+        return "-";
+
+    }
+
+    return (
+        Number(value) * 100
+    ).toFixed(2) + "%";
+
+}
+
+
+function statusClass(
+    value
+) {
+
+    if (!value) {
+
+        return "status-unknown";
+
+    }
+
+    const normalized =
+        String(value).toLowerCase();
+
+    if (
+        normalized === "pass" ||
+        normalized === "passed"
+    ) {
+
+        return "status-pass";
+
+    }
+
+    if (
+        normalized === "fail" ||
+        normalized === "failed"
+    ) {
+
+        return "status-fail";
+
+    }
+
+    return "status-unknown";
+
+}
+
+
+function formatAuthenticationStatus(
+    value
+) {
+
+    if (!value) {
+
+        return "UNKNOWN — no authentication result found";
+
+    }
+
+    const normalized =
+        String(value).toLowerCase();
+
+    if (
+        normalized === "pass" ||
+        normalized === "passed"
+    ) {
+
+        return "PASS";
+
+    }
+
+    if (
+        normalized === "fail" ||
+        normalized === "failed"
+    ) {
+
+        return "FAIL";
+
+    }
+
+    if (
+        normalized === "unknown"
+    ) {
+
+        return "UNKNOWN — no authentication result found";
+
+    }
+
+    return String(
+        value
+    ).toUpperCase();
+
+}
+
+
+/* =========================================================
+   THREAT OVERVIEW
+========================================================= */
+
+function displayThreatOverview(
+    data
+) {
+
+    const assessment =
+        data.threat_assessment || {};
+
+    const ml =
+        data.ml || {};
+
+    const score =
+        assessment.score ?? "-";
+
+    const risk =
+        assessment.risk_level || "-";
+
+    const scoreElement =
+        document.getElementById(
+            "threatScore"
+        );
+
+    const riskElement =
+        document.getElementById(
+            "riskLevel"
+        );
+
+    scoreElement.textContent =
+        score +
+        (
+            score !== "-"
+                ? "/100"
+                : ""
+        );
+
+    riskElement.textContent =
+        risk;
+
+    scoreElement.className =
+        "metric-value";
+
+    riskElement.className =
+        "metric-value";
+
+    const riskLower =
+        String(
+            risk
+        ).toLowerCase();
+
+    if (
+        riskLower === "high"
+    ) {
+
+        scoreElement.classList.add(
+            "risk-high"
+        );
+
+        riskElement.classList.add(
+            "risk-high"
+        );
+
+    } else if (
+        riskLower === "medium"
+    ) {
+
+        scoreElement.classList.add(
+            "risk-medium"
+        );
+
+        riskElement.classList.add(
+            "risk-medium"
+        );
+
+    } else if (
+        riskLower === "low"
+    ) {
+
+        scoreElement.classList.add(
+            "risk-low"
+        );
+
+        riskElement.classList.add(
+            "risk-low"
+        );
+
+    }
+
+    document.getElementById(
+        "mlPrediction"
+    ).textContent =
+        ml.prediction || "-";
+
+    document.getElementById(
+        "phishingProbability"
+    ).textContent =
+        formatPercentage(
+            ml.phishing_probability
+        );
+
+    document.getElementById(
+        "urlCount"
+    ).textContent =
+        data.url_intelligence?.url_count ?? 0;
+
+    document.getElementById(
+        "attachmentCount"
+    ).textContent =
+        data.attachments?.attachment_count ?? 0;
+
+    document.getElementById(
+        "ipCount"
+    ).textContent =
+        data.ip_intelligence?.ip_count ?? 0;
+
+    document.getElementById(
+        "relayCount"
+    ).textContent =
+        data.relay?.hop_count ?? 0;
+
+}
+
+
+/* =========================================================
+   BLOCKCHAIN INTEGRITY DISPLAY
+========================================================= */
+
+function displayBlockchainIntegrity(
+    data
+) {
+
+    const integrity =
+        data.evidence_integrity || {};
+
+    const blockchain =
+        integrity.blockchain || {};
+
+    const statusElement =
+        document.getElementById(
+            "integrityStatus"
+        );
+
+    const status =
+        blockchain.verification_status ||
+        "NOT AVAILABLE";
+
+    statusElement.textContent =
+        status === "VERIFIED"
+            ? "✅ BLOCKCHAIN VERIFIED"
+            : "⚠ " + status;
+
+    statusElement.className =
+        "integrity-status";
+
+    if (
+        status === "VERIFIED"
+    ) {
+
+        statusElement.classList.add(
+            "integrity-verified"
+        );
+
+    } else {
+
+        statusElement.classList.add(
+            "integrity-mismatch"
+        );
+
+    }
+
+    document.getElementById(
+        "caseId"
+    ).textContent =
+        integrity.case_id || "-";
+
+    document.getElementById(
+        "hashAlgorithm"
+    ).textContent =
+        integrity.hash_algorithm || "-";
+
+    document.getElementById(
+        "blockNumber"
+    ).textContent =
+        blockchain.block_number ?? "-";
+
+
+    const evidenceMatch =
+        document.getElementById(
+            "evidenceMatch"
+        );
+
+    if (
+        blockchain.evidence_match === true
+    ) {
+
+        evidenceMatch.textContent =
+            "✓ MATCH";
+
+        evidenceMatch.className =
+            "info-value status-pass";
+
+    } else if (
+        blockchain.evidence_match === false
+    ) {
+
+        evidenceMatch.textContent =
+            "⚠ MISMATCH";
+
+        evidenceMatch.className =
+            "info-value status-fail";
+
+    } else {
+
+        evidenceMatch.textContent =
+            "UNKNOWN";
+
+        evidenceMatch.className =
+            "info-value status-unknown";
+
+    }
+
+
+    const reportMatch =
+        document.getElementById(
+            "reportMatch"
+        );
+
+    if (
+        blockchain.report_match === true
+    ) {
+
+        reportMatch.textContent =
+            "✓ MATCH";
+
+        reportMatch.className =
+            "info-value status-pass";
+
+    } else if (
+        blockchain.report_match === false
+    ) {
+
+        reportMatch.textContent =
+            "⚠ MISMATCH";
+
+        reportMatch.className =
+            "info-value status-fail";
+
+    } else {
+
+        reportMatch.textContent =
+            "UNKNOWN";
+
+        reportMatch.className =
+            "info-value status-unknown";
+
+    }
+
+
+    document.getElementById(
+        "integrityCreatedAt"
+    ).textContent =
+        integrity.created_at || "-";
+
+    document.getElementById(
+        "evidenceSha256"
+    ).textContent =
+        integrity.evidence_sha256 || "-";
+
+    document.getElementById(
+        "reportSha256"
+    ).textContent =
+        integrity.report_sha256 || "-";
+
+    document.getElementById(
+        "transactionHash"
+    ).textContent =
+        blockchain.transaction_hash || "-";
+
+}
+
+
+/* =========================================================
+   AUTHENTICATION
+========================================================= */
+
+function displayAuthentication(
+    data
+) {
+
+    const authentication =
+        data.authentication || {};
+
+    const spf =
+        document.getElementById(
+            "spfStatus"
+        );
+
+    const dkim =
+        document.getElementById(
+            "dkimStatus"
+        );
+
+    const dmarc =
+        document.getElementById(
+            "dmarcStatus"
+        );
+
+    const spfValue =
+        authentication.spf ||
+        "unknown";
+
+    const dkimValue =
+        authentication.dkim ||
+        "unknown";
+
+    const dmarcValue =
+        authentication.dmarc ||
+        "unknown";
+
+    spf.textContent =
+        formatAuthenticationStatus(
+            spfValue
+        );
+
+    dkim.textContent =
+        formatAuthenticationStatus(
+            dkimValue
+        );
+
+    dmarc.textContent =
+        formatAuthenticationStatus(
+            dmarcValue
+        );
+
+    spf.className =
+        "info-value " +
+        statusClass(
+            spfValue
+        );
+
+    dkim.className =
+        "info-value " +
+        statusClass(
+            dkimValue
+        );
+
+    dmarc.className =
+        "info-value " +
+        statusClass(
+            dmarcValue
+        );
+
+}
+
+
+/* =========================================================
+   EMAIL INFORMATION
+========================================================= */
+
+function displayEmailInformation(
+    data
+) {
+
+    const email =
+        data.email || {};
+
+    document.getElementById(
+        "emailFrom"
+    ).textContent =
+        email.from || "-";
+
+    document.getElementById(
+        "emailTo"
+    ).textContent =
+        email.to || "-";
+
+    document.getElementById(
+        "emailSubject"
+    ).textContent =
+        email.subject || "-";
+
+    document.getElementById(
+        "emailDate"
+    ).textContent =
+        email.date || "-";
+
+    document.getElementById(
+        "messageId"
+    ).textContent =
+        email.message_id || "-";
+
+    document.getElementById(
+        "returnPath"
+    ).textContent =
+        email.return_path || "-";
+
+    document.getElementById(
+        "replyTo"
+    ).textContent =
+        email.reply_to || "-";
+
+}
+
+
+/* =========================================================
+   SENDER ANALYSIS
+========================================================= */
+
+function displaySenderAnalysis(
+    data
+) {
+
+    const sender =
+        data.sender_analysis || {};
+
+    document.getElementById(
+        "senderFromDomain"
+    ).textContent =
+        sender.from_domain ||
+        "Unknown";
+
+    document.getElementById(
+        "senderReturnPathDomain"
+    ).textContent =
+        sender.return_path_domain ||
+        "Unknown";
+
+    document.getElementById(
+        "senderReplyToDomain"
+    ).textContent =
+        sender.reply_to_domain ||
+        "Unknown";
+
+
+    const returnPathMatch =
+        document.getElementById(
+            "returnPathMatch"
+        );
+
+    const replyToMatch =
+        document.getElementById(
+            "replyToMatch"
+        );
+
+
+    if (
+        sender.return_path_mismatch === true
+    ) {
+
+        returnPathMatch.textContent =
+            "⚠ MISMATCH";
+
+        returnPathMatch.className =
+            "info-value status-fail";
+
+    } else if (
+        sender.return_path_mismatch === false &&
+        sender.from_domain &&
+        sender.return_path_domain
+    ) {
+
+        returnPathMatch.textContent =
+            "✓ MATCH";
+
+        returnPathMatch.className =
+            "info-value status-pass";
+
+    } else {
+
+        returnPathMatch.textContent =
+            "UNKNOWN";
+
+        returnPathMatch.className =
+            "info-value status-unknown";
+
+    }
+
+
+    if (
+        sender.reply_to_mismatch === true
+    ) {
+
+        replyToMatch.textContent =
+            "⚠ MISMATCH";
+
+        replyToMatch.className =
+            "info-value status-fail";
+
+    } else if (
+        sender.reply_to_mismatch === false &&
+        sender.from_domain &&
+        sender.reply_to_domain
+    ) {
+
+        replyToMatch.textContent =
+            "✓ MATCH";
+
+        replyToMatch.className =
+            "info-value status-pass";
+
+    } else {
+
+        replyToMatch.textContent =
+            "UNKNOWN";
+
+        replyToMatch.className =
+            "info-value status-unknown";
+
+    }
+
+}
+
+
+/* =========================================================
+   IP INTELLIGENCE
+========================================================= */
+
+function displayIPIntelligence(
+    ipIntelligence
+) {
+
+    const container =
+        document.getElementById(
+            "ipIntelligence"
+        );
+
+    if (
+        !ipIntelligence ||
+        !ipIntelligence.ips ||
+        ipIntelligence.ips.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No IP addresses found in this email.
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = "";
+
+    ipIntelligence.ips.forEach(
+        (ipData) => {
+
+            const geo =
+                ipData.geolocation;
+
+            html += `
+                <div class="ip-card">
+
+                    <div class="ip-title">
+                        🌐 ${escapeHtml(
+                            ipData.ip
+                        )}
+                    </div>
+
+                    <div class="badges">
+
+                        <span class="badge info">
+                            ${escapeHtml(
+                                ipData.classification ||
+                                "unknown"
+                            )}
+                        </span>
+
+                    </div>
+            `;
+
+
+            if (
+                geo &&
+                geo.success
+            ) {
+
+                html += `
+                    <div class="info-grid">
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Country
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.country
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Country Code
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.country_code
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Region
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.region
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                City
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.city
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Latitude
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.latitude
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Longitude
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.longitude
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                ISP
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.isp
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                Organization
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.organization
+                                )}
+                            </div>
+                        </div>
+
+                        <div class="info-item">
+                            <div class="info-label">
+                                ASN
+                            </div>
+                            <div class="info-value">
+                                ${escapeHtml(
+                                    geo.asn
+                                )}
+                            </div>
+                        </div>
+
+                    </div>
+                `;
+
+
+                if (
+                    geo.latitude !== null &&
+                    geo.longitude !== null
+                ) {
+
+                    const mapUrl =
+                        "https://www.google.com/maps/search/?api=1&query=" +
+                        encodeURIComponent(
+                            `${geo.latitude},${geo.longitude}`
+                        );
+
+                    html += `
+                        <a
+                            class="map-link"
+                            href="${mapUrl}"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            🗺️ View Location on Map
+                        </a>
+                    `;
+
+                }
+
+            } else {
+
+                let message =
+                    "Geolocation information is not available for this IP.";
+
+                if (
+                    ipData.classification ===
+                    "documentation"
+                ) {
+
+                    message =
+                        "This is a documentation/test IP address, so real-world geolocation is not applicable.";
+
+                } else if (
+                    ipData.classification ===
+                    "private"
+                ) {
+
+                    message =
+                        "This is a private IP address and does not have public Internet geolocation.";
+
+                } else if (
+                    geo &&
+                    geo.error
+                ) {
+
+                    message =
+                        geo.error;
+
+                }
+
+                html += `
+                    <div class="empty-state">
+                        ℹ️ ${escapeHtml(
+                            message
+                        )}
+                    </div>
+                `;
+
+            }
+
+            html += `
+                </div>
+            `;
+
+        }
+    );
+
+    container.innerHTML =
+        html;
+
+}
+
+
+/* =========================================================
+   URL INTELLIGENCE
+========================================================= */
+
+function displayUrlIntelligence(
+    urlIntelligence
+) {
+
+    const container =
+        document.getElementById(
+            "urlIntelligence"
+        );
+
+    if (
+        !urlIntelligence ||
+        !urlIntelligence.urls ||
+        urlIntelligence.urls.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No URLs found in this email.
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = "";
+
+    urlIntelligence.urls.forEach(
+        (urlData) => {
+
+            const indicators =
+                urlData.indicators || {};
+
+            const domainIntel =
+                urlData.domain_intelligence || {};
+
+            let indicatorBadges =
+                "";
+
+            if (
+                indicators.uses_http
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge danger">
+                        ⚠ HTTP
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.uses_ip_address
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge danger">
+                        ⚠ IP Address
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.contains_url_encoding
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge warning">
+                        ⚠ URL Encoding
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.has_punycode
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge warning">
+                        ⚠ Punycode
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.long_domain
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge warning">
+                        ⚠ Long Domain
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.many_subdomains
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge warning">
+                        ⚠ Many Subdomains
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.suspicious_characters
+            ) {
+
+                indicatorBadges += `
+                    <span class="badge danger">
+                        ⚠ Suspicious Characters
+                    </span>
+                `;
+
+            }
+
+            if (!indicatorBadges) {
+
+                indicatorBadges = `
+                    <span class="badge safe">
+                        ✓ No Suspicious URL Indicators
+                    </span>
+                `;
+
+            }
+
+
+            let domainBadges =
+                "";
+
+            if (
+                domainIntel.has_ip_address
+            ) {
+
+                domainBadges += `
+                    <span class="badge danger">
+                        ⚠ IP-Based Domain
+                    </span>
+                `;
+
+            }
+
+            if (
+                domainIntel.has_punycode
+            ) {
+
+                domainBadges += `
+                    <span class="badge warning">
+                        ⚠ Punycode Domain
+                    </span>
+                `;
+
+            }
+
+            if (
+                domainIntel.has_suspicious_characters
+            ) {
+
+                domainBadges += `
+                    <span class="badge danger">
+                        ⚠ Suspicious Domain Characters
+                    </span>
+                `;
+
+            }
+
+            if (!domainBadges) {
+
+                domainBadges = `
+                    <span class="badge safe">
+                        ✓ No Suspicious Domain Indicators
+                    </span>
+                `;
+
+            }
+
+
+            html += `
+                <div class="url-card">
+
+                    <div class="url-value">
+                        🔗 ${escapeHtml(
+                            urlData.url
+                        )}
+                    </div>
+
+                    <div class="url-details">
+
+                        <div>
+                            <strong>Scheme:</strong>
+                            ${escapeHtml(
+                                urlData.scheme ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>Domain:</strong>
+                            ${escapeHtml(
+                                urlData.domain ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>Path:</strong>
+                            ${escapeHtml(
+                                urlData.path ||
+                                "/"
+                            )}
+                        </div>
+
+                    </div>
+
+                    <div class="domain-intelligence">
+
+                        <div class="domain-intelligence-title">
+                            🌐 Domain Intelligence
+                        </div>
+
+                        <div class="domain-grid">
+
+                            <div class="domain-item">
+                                <strong>Domain Length</strong><br>
+                                ${escapeHtml(
+                                    domainIntel.length ??
+                                    "Unknown"
+                                )}
+                            </div>
+
+                            <div class="domain-item">
+                                <strong>Subdomains</strong><br>
+                                ${escapeHtml(
+                                    domainIntel.subdomain_count ??
+                                    "Unknown"
+                                )}
+                            </div>
+
+                            <div class="domain-item">
+                                <strong>IP Address Domain</strong><br>
+                                ${
+                                    domainIntel.has_ip_address
+                                        ? "Yes"
+                                        : "No"
+                                }
+                            </div>
+
+                            <div class="domain-item">
+                                <strong>Punycode</strong><br>
+                                ${
+                                    domainIntel.has_punycode
+                                        ? "Yes"
+                                        : "No"
+                                }
+                            </div>
+
+                            <div class="domain-item">
+                                <strong>Suspicious Characters</strong><br>
+                                ${
+                                    domainIntel.has_suspicious_characters
+                                        ? "Yes"
+                                        : "No"
+                                }
+                            </div>
+
+                        </div>
+
+                        <div class="badges">
+                            ${domainBadges}
+                        </div>
+
+                    </div>
+
+                    <div class="url-indicators">
+
+                        <strong>URL Indicators</strong>
+
+                        <div class="badges">
+                            ${indicatorBadges}
+                        </div>
+
+                    </div>
+
+                </div>
+            `;
+
+        }
+    );
+
+    container.innerHTML =
+        html;
+
+}
+
+
+/* =========================================================
+   RELAY ANALYSIS
+========================================================= */
+
+function displayRelayChain(
+    relay
+) {
+
+    const container =
+        document.getElementById(
+            "relayAnalysis"
+        );
+
+    if (
+        !relay ||
+        !relay.hops ||
+        relay.hops.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No Received relay headers found.
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = `
+        <div class="badges">
+
+            <span class="badge info">
+                ${escapeHtml(
+                    relay.hop_count
+                )} hop(s)
+            </span>
+
+            <span class="badge ${
+                relay.anomaly_count > 0
+                    ? "danger"
+                    : "safe"
+            }">
+
+                ${escapeHtml(
+                    relay.anomaly_count
+                )} anomal${
+                    relay.anomaly_count === 1
+                        ? "y"
+                        : "ies"
+                }
+
+            </span>
+
+        </div>
+    `;
+
+
+    relay.hops.forEach(
+        (hop) => {
+
+            html += `
+                <div class="relay-card">
+
+                    <div class="ip-title">
+                        📡 Hop ${escapeHtml(
+                            hop.hop
+                        )}
+                    </div>
+
+                    <div class="relay-details">
+
+                        <div>
+                            <strong>
+                                Source Server:
+                            </strong>
+
+                            ${escapeHtml(
+                                hop.source_server ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Source IP:
+                            </strong>
+
+                            ${escapeHtml(
+                                hop.source_ip ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Destination:
+                            </strong>
+
+                            ${escapeHtml(
+                                hop.destination_server ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Protocol:
+                            </strong>
+
+                            ${escapeHtml(
+                                hop.protocol ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Timestamp:
+                            </strong>
+
+                            ${escapeHtml(
+                                hop.timestamp ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                    </div>
+            `;
+
+
+            if (
+                hop.anomalies &&
+                hop.anomalies.length > 0
+            ) {
+
+                html += `
+                    <div class="badges">
+                `;
+
+                hop.anomalies.forEach(
+                    (anomaly) => {
+
+                        html += `
+                            <span class="badge danger">
+                                ⚠ ${escapeHtml(
+                                    anomaly
+                                )}
+                            </span>
+                        `;
+
+                    }
+                );
+
+                html += `
+                    </div>
+                `;
+
+            } else {
+
+                html += `
+                    <span class="badge safe">
+                        ✓ No anomalies
+                    </span>
+                `;
+
+            }
+
+            html += `
+                </div>
+            `;
+
+        }
+    );
+
+    container.innerHTML =
+        html;
+
+}
+
+
+/* =========================================================
+   ATTACHMENT INTELLIGENCE
+========================================================= */
+
+function displayAttachmentIntelligence(
+    attachments
+) {
+
+    const container =
+        document.getElementById(
+            "attachmentIntelligence"
+        );
+
+    if (
+        !attachments ||
+        !attachments.files ||
+        attachments.files.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No attachments found.
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = "";
+
+    attachments.files.forEach(
+        (file) => {
+
+            const indicators =
+                file.indicators || {};
+
+            let badges =
+                "";
+
+            if (
+                indicators.suspicious_extension
+            ) {
+
+                badges += `
+                    <span class="badge danger">
+                        ⚠ Suspicious Extension
+                    </span>
+                `;
+
+            }
+
+            if (
+                indicators.double_extension
+            ) {
+
+                badges += `
+                    <span class="badge danger">
+                        ⚠ Double Extension
+                    </span>
+                `;
+
+            }
+
+            if (!badges) {
+
+                badges = `
+                    <span class="badge safe">
+                        ✓ No Suspicious Indicators
+                    </span>
+                `;
+
+            }
+
+
+            html += `
+                <div class="attachment-card">
+
+                    <div class="attachment-title">
+                        📎 ${escapeHtml(
+                            file.filename ||
+                            "Unnamed attachment"
+                        )}
+                    </div>
+
+                    <div class="attachment-details">
+
+                        <div>
+                            <strong>
+                                Extension:
+                            </strong>
+
+                            ${escapeHtml(
+                                file.extension ||
+                                "None"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Content Type:
+                            </strong>
+
+                            ${escapeHtml(
+                                file.content_type ||
+                                "Unknown"
+                            )}
+                        </div>
+
+                        <div>
+                            <strong>
+                                Size:
+                            </strong>
+
+                            ${escapeHtml(
+                                file.size_bytes ?? 0
+                            )} bytes
+                        </div>
+
+                    </div>
+
+                    <div class="badges">
+                        ${badges}
+                    </div>
+
+                </div>
+            `;
+
+        }
+    );
+
+    container.innerHTML =
+        html;
+
+}
+
+
+/* =========================================================
+   THREAT REASONS
+========================================================= */
+
+function displayThreatReasons(
+    assessment
+) {
+
+    const container =
+        document.getElementById(
+            "threatIndicators"
+        );
+
+    const reasons =
+        assessment?.reasons || [];
+
+    if (
+        reasons.length === 0
+    ) {
+
+        container.innerHTML = `
+            <div class="empty-state">
+                No specific threat indicators detected.
+            </div>
+        `;
+
+        return;
+    }
+
+    let html = `
+        <ul class="reason-list">
+    `;
+
+    reasons.forEach(
+        (reason) => {
+
+            html += `
+                <li>
+                    ${escapeHtml(
+                        reason
+                    )}
+                </li>
+            `;
+
+        }
+    );
+
+    html += `
+        </ul>
+    `;
+
+    container.innerHTML =
+        html;
+
+}
+
+
+/* =========================================================
+   RAW RESULT
+========================================================= */
+
+function displayRawResult(
+    data
+) {
+
+    document.getElementById(
+        "rawResult"
+    ).textContent =
+        JSON.stringify(
+            data,
+            null,
+            4
+        );
+
+}
+
+
+/* =========================================================
+   EMAIL ANALYSIS
+========================================================= */
+
+async function analyzeEmail() {
+
+    clearMessage();
+
+    const fileInput =
+        document.getElementById(
+            "emailFile"
+        );
+
+    const button =
+        document.getElementById(
+            "analyzeButton"
+        );
+
+    const loading =
+        document.getElementById(
+            "loading"
+        );
+
+
+    if (
+        !fileInput.files ||
+        fileInput.files.length === 0
+    ) {
+
+        setMessage(
+            "Please select an .eml file first.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const file =
+        fileInput.files[0];
+
+
+    if (
+        !file.name
+            .toLowerCase()
+            .endsWith(".eml")
+    ) {
+
+        setMessage(
+            "Only .eml files are supported.",
+            "error"
+        );
+
+        return;
+    }
+
+
+    const formData =
+        new FormData();
+
+    formData.append(
+        "file",
+        file
+    );
+
+
+    button.disabled =
+        true;
+
+    loading.style.display =
+        "block";
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_URL}/analyze-email`,
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.detail ||
+                "Email analysis failed."
+            );
+
+        }
+
+
+        displayThreatOverview(
+            data
+        );
+
+        displayBlockchainIntegrity(
+            data
+        );
+
+        displayAuthentication(
+            data
+        );
+
+        displayEmailInformation(
+            data
+        );
+
+        displaySenderAnalysis(
+            data
+        );
+
+        displayIPIntelligence(
+            data.ip_intelligence
+        );
+
+        displayUrlIntelligence(
+            data.url_intelligence
+        );
+
+        displayRelayChain(
+            data.relay
+        );
+
+        displayAttachmentIntelligence(
+            data.attachments
+        );
+
+        displayThreatReasons(
+            data.threat_assessment
+        );
+
+        displayRawResult(
+            data
+        );
+
+
+        setMessage(
+            "Email analysis completed successfully.",
+            "success"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Email analysis error:",
+            error
+        );
+
+        setMessage(
+            error.message ||
+            "Unable to analyze email.",
+            "error"
+        );
+
+
+    } finally {
+
+        button.disabled =
+            false;
+
+        loading.style.display =
+            "none";
+
+    }
+
+}
+
+
+/* =========================================================
+   MANUAL BLOCKCHAIN VERIFICATION
+========================================================= */
+
+async function verifyBlockchainIntegrity(
+    event
+) {
+
+    /*
+        Prevent any default browser action.
+
+        This is an additional safety measure even though
+        the button is explicitly type="button".
+    */
+
+    if (event) {
+
+        event.preventDefault();
+
+    }
+
+
+    const transactionHash =
+        document.getElementById(
+            "verifyTransactionHash"
+        ).value.trim();
+
+    const evidenceHash =
+        document.getElementById(
+            "verifyEvidenceHash"
+        ).value.trim();
+
+    const reportHash =
+        document.getElementById(
+            "verifyReportHash"
+        ).value.trim();
+
+    const resultElement =
+        document.getElementById(
+            "manualVerificationResult"
+        );
+
+
+    if (
+        !transactionHash ||
+        !evidenceHash ||
+        !reportHash
+    ) {
+
+        resultElement.innerHTML = `
+            <div class="integrity-status integrity-mismatch">
+                ⚠️ Please enter all three values.
+            </div>
+        `;
+
+        return;
+    }
+
+
+    resultElement.innerHTML = `
+        <div class="integrity-status">
+            🔄 Verifying blockchain record...
+        </div>
+    `;
+
+
+    try {
+
+        const response =
+            await fetch(
+                `${API_URL}/verify-integrity`,
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        transaction_hash:
+                            transactionHash,
+
+                        evidence_sha256:
+                            evidenceHash,
+
+                        report_sha256:
+                            reportHash
+
+                    })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            let errorMessage =
+                "Blockchain verification failed.";
+
+            if (
+                typeof data.detail ===
+                "string"
+            ) {
+
+                errorMessage =
+                    data.detail;
+
+            } else if (
+                Array.isArray(
+                    data.detail
+                )
+            ) {
+
+                errorMessage =
+                    data.detail
+                        .map(
+                            item =>
+                                item.msg ||
+                                JSON.stringify(
+                                    item
+                                )
+                        )
+                        .join(
+                            "; "
+                        );
+
+            }
+
+            throw new Error(
+                errorMessage
+            );
+
+        }
+
+
+        const verified =
+            data.verification_status ===
+            "VERIFIED";
+
+
+        if (verified) {
+
+            resultElement.innerHTML = `
+
+                <div class="integrity-status integrity-verified">
+
+                    ✅ BLOCKCHAIN VERIFIED
+
+                </div>
+
+                <div class="info-grid">
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Verification Status
+                        </div>
+
+                        <div class="info-value">
+                            VERIFIED
+                        </div>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Evidence Match
+                        </div>
+
+                        <div class="info-value">
+                            ✓ MATCH
+                        </div>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Report Match
+                        </div>
+
+                        <div class="info-value">
+                            ✓ MATCH
+                        </div>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Case ID
+                        </div>
+
+                        <div class="info-value">
+                            ${
+                                data.blockchain_record
+                                    ?.case_id || "-"
+                            }
+                        </div>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Block Number
+                        </div>
+
+                        <div class="info-value">
+                            ${
+                                data.blockchain_record
+                                    ?.block_number ?? "-"
+                            }
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `;
+
+        } else {
+
+            resultElement.innerHTML = `
+
+                <div class="integrity-status integrity-mismatch">
+
+                    ⚠️ INTEGRITY MISMATCH
+
+                </div>
+
+                <div class="info-grid">
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Evidence Match
+                        </div>
+
+                        <div class="info-value">
+                            ${
+                                data.evidence_match
+                                    ? "✓ MATCH"
+                                    : "✗ MISMATCH"
+                            }
+                        </div>
+
+                    </div>
+
+
+                    <div class="info-item">
+
+                        <div class="info-label">
+                            Report Match
+                        </div>
+
+                        <div class="info-value">
+                            ${
+                                data.report_match
+                                    ? "✓ MATCH"
+                                    : "✗ MISMATCH"
+                            }
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `;
+
+        }
+
+
+    } catch (error) {
+
+        console.error(
+            "Blockchain verification error:",
+            error
+        );
+
+        resultElement.innerHTML = `
+
+            <div class="integrity-status integrity-mismatch">
+
+                ⚠️ Verification Error
+
+            </div>
+
+            <div style="margin-top: 10px;">
+
+                ${escapeHtml(
+                    error.message ||
+                    "Blockchain verification failed."
+                )}
+
+            </div>
+
+        `;
+
+    }
+
+}
+
+</script>
+
+</body>
+
+</html>
