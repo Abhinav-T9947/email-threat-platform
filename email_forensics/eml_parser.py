@@ -1,6 +1,7 @@
 from email import policy
 from email.parser import BytesParser
 import re
+import ipaddress
 
 from email_forensics.url_analyzer import (
     extract_urls,
@@ -51,17 +52,24 @@ from ml.email_ml_detector import (
 
 def extract_ip_addresses(text):
     """
-    Extract IPv4 addresses from text.
+    Extract valid IPv4 addresses from text.
+
+    Avoid matching IPv4-looking fragments inside longer dotted
+    numeric sequences, such as timestamps.
     """
+    ip_pattern = r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])"
 
-    ip_pattern = (
-        r"\b(?:\d{1,3}\.){3}\d{1,3}\b"
-    )
+    candidates = re.findall(ip_pattern, str(text))
+    valid_ips = []
 
-    return re.findall(
-        ip_pattern,
-        text
-    )
+    for candidate in candidates:
+        try:
+            ipaddress.IPv4Address(candidate)
+            valid_ips.append(candidate)
+        except ipaddress.AddressValueError:
+            continue
+
+    return valid_ips
 
 
 def extract_body(message):

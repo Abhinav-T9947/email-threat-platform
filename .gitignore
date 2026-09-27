@@ -56,3 +56,6 @@ Thumbs.db
 
 # Legacy local blockchain ledger
 /backend/blockchain/data/blockchain_ledger.json
+# Gmail OAuth credentials
+credentials.json
+token.json
