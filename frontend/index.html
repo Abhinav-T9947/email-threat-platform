@@ -541,6 +541,44 @@
             >
                 Analyze Gmail Test Email
             </button>
+            <div
+    id="gmailSearchArea"
+    style="margin-top: 20px; width: 100%;"
+>
+    <h3>Search Gmail (Read-only)</h3>
+
+    <label for="gmailSearchDays">
+    Search messages from the last
+</label>
+
+<select
+    id="gmailSearchDays"
+    style="display: block; margin: 8px 0;"
+>
+    <option value="1">1 day</option>
+    <option value="7" selected>7 days</option>
+    <option value="30">30 days</option>
+    <option value="90">90 days</option>
+</select>
+    <button
+        type="button"
+        id="gmailSearchButton"
+        onclick="searchGmailMessages()"
+    >
+        Search Gmail
+    </button>
+
+    <div
+        id="gmailSearchMessage"
+        role="status"
+        style="margin-top: 10px;"
+    ></div>
+
+    <div
+        id="gmailSearchResults"
+        style="margin-top: 12px;"
+    ></div>
+</div>
 
         </div>
 
@@ -3483,6 +3521,133 @@ async function analyzeGmailTestEmail() {
     } finally {
         button.disabled = false;
         button.textContent = "Analyze Gmail Test Email";
+    }
+}
+async function searchGmailMessages() {
+    const searchButton = document.getElementById("gmailSearchButton");
+    const daysInput = document.getElementById("gmailSearchDays");
+    const messageElement = document.getElementById("gmailSearchMessage");
+    const resultsElement = document.getElementById("gmailSearchResults");
+
+    const days = daysInput.value;
+const query = `newer_than:${days}d`;
+
+    searchButton.disabled = true;
+    searchButton.textContent = "Searching...";
+    messageElement.textContent = "Searching Gmail...";
+    resultsElement.replaceChildren();
+
+    try {
+        const response = await fetch(
+            `${API_URL}/gmail/search?query=${encodeURIComponent(query)}`
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Gmail search failed.");
+        }
+
+        messageElement.textContent =
+            `Found ${data.result_count} matching message(s).`;
+
+        if (!data.messages || data.messages.length === 0) {
+            resultsElement.textContent = "No matching messages found.";
+            return;
+        }
+
+        data.messages.forEach((email) => {
+            const card = document.createElement("div");
+            card.style.border = "1px solid #d1d5db";
+            card.style.borderRadius = "8px";
+            card.style.padding = "12px";
+            card.style.marginBottom = "10px";
+
+            const subject = document.createElement("div");
+            subject.style.fontWeight = "600";
+            subject.textContent = email.subject || "(No subject)";
+
+            const sender = document.createElement("div");
+            sender.style.marginTop = "6px";
+            sender.textContent = `From: ${email.from || "Unknown sender"}`;
+
+            const date = document.createElement("div");
+            date.style.marginTop = "4px";
+            date.style.fontSize = "13px";
+            date.textContent = `Date: ${email.date || "Unknown date"}`;
+
+            const analyzeButton = document.createElement("button");
+            analyzeButton.type = "button";
+            analyzeButton.textContent = "Analyze this email";
+
+            analyzeButton.addEventListener("click", () => {
+                analyzeSelectedGmailMessage(email.message_id, analyzeButton);
+            });
+
+            card.append(subject, sender, date, analyzeButton);
+            resultsElement.appendChild(card);
+        });
+
+    } catch (error) {
+        console.error("Gmail search error:", error);
+        messageElement.textContent = `Search failed: ${error.message}`;
+    } finally {
+        searchButton.disabled = false;
+        searchButton.textContent = "Search Gmail";
+    }
+}
+
+
+async function analyzeSelectedGmailMessage(messageId, button) {
+    button.disabled = true;
+    button.textContent = "Analyzing...";
+
+    const messageElement = document.getElementById("gmailSearchMessage");
+
+    try {
+        const response = await fetch(
+            `${API_URL}/gmail/messages/${encodeURIComponent(messageId)}/analyze`,
+            {
+                method: "POST"
+            }
+        );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || "Selected email analysis failed.");
+        }
+
+        displayThreatOverview(result);
+        displayBlockchainIntegrity(result);
+        displayAuthentication(result);
+        displayEmailInformation(result);
+        displaySenderAnalysis(result);
+        displayIPIntelligence(result);
+        displayUrlIntelligence(result);
+        displayRelayChain(result);
+        displayAttachmentIntelligence(result);
+        displayThreatReasons(result);
+        displayRawResult(result);
+
+        if (result.already_analyzed) {
+            messageElement.textContent =
+                "This email was already analyzed. The existing case was reused.";
+        } else {
+            messageElement.textContent =
+                "Email analyzed. A new forensic case and blockchain record were created.";
+        }
+
+        button.disabled = false;
+button.textContent = result.already_analyzed
+    ? "Check existing case"
+    : "View analysis again";
+
+    } catch (error) {
+        console.error("Selected Gmail analysis error:", error);
+        messageElement.textContent = `Analysis failed: ${error.message}`;
+        button.disabled = false;
+        button.textContent = "Retry analysis";
     }
 }
 </script>

@@ -144,7 +144,20 @@ def get_case(case_id):
     finally:
 
         db.close()
+def get_case_by_evidence_hash(evidence_sha256):
+    db = SessionLocal()
 
+    try:
+        return (
+            db.query(ForensicCase)
+            .filter(
+                ForensicCase.evidence_sha256 == evidence_sha256
+            )
+            .first()
+        )
+
+    finally:
+        db.close()
 
 if __name__ == "__main__":
 

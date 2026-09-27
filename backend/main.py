@@ -11,7 +11,8 @@ from fastapi import (
     UploadFile,
     File,
     Form,
-    HTTPException
+    HTTPException,
+    Query
 )
 
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +38,8 @@ from backend.blockchain.blockchain_ledger import (
 from backend.database import (
     initialize_database,
     create_case,
-    get_case
+    get_case,
+    get_case_by_evidence_hash
 )
 
 
@@ -308,7 +310,269 @@ async def analyze_email(
 # ============================================================
 # READ-ONLY GMAIL TEST EMAIL ANALYSIS
 # ============================================================
+@app.get("/gmail/search")
+def search_gmail(
+    query: str = Query(
+        default="newer_than:7d",
+        max_length=200,
+        description="Gmail search query, such as newer_than:7d or label:inbox"
+    )
+):
+    """Search Gmail read-only and return basic message details."""
 
+    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
+    project_root = Path(__file__).resolve().parent.parent
+    token_path = project_root / "token.json"
+
+    if not token_path.exists():
+        raise HTTPException(
+            status_code=401,
+            detail="Gmail token.json was not found. Complete Gmail authorization first."
+        )
+
+    try:
+        credentials = Credentials.from_authorized_user_file(
+            str(token_path),
+            scopes=[gmail_scope]
+        )
+
+        if not credentials.has_scopes([gmail_scope]):
+            raise HTTPException(
+                status_code=403,
+                detail="Gmail authorization does not include the required read-only scope."
+            )
+
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(credentials.to_json())
+
+        if not credentials.valid:
+            raise HTTPException(
+                status_code=401,
+                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
+            )
+
+        gmail_service = build(
+            "gmail",
+            "v1",
+            credentials=credentials
+        )
+
+        search_response = (
+            gmail_service.users()
+            .messages()
+            .list(
+                userId="me",
+                q=query,
+                maxResults=20
+            )
+            .execute()
+        )
+
+        results = []
+
+        for message in search_response.get("messages", []):
+            details = (
+                gmail_service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=message["id"],
+                    format="metadata",
+                    metadataHeaders=["Subject", "From", "Date"]
+                )
+                .execute()
+            )
+
+            headers = details.get("payload", {}).get("headers", [])
+
+            header_values = {
+                header.get("name", "").lower(): header.get("value", "")
+                for header in headers
+            }
+
+            results.append({
+                "message_id": message["id"],
+                "subject": header_values.get("subject", "(No subject)"),
+                "from": header_values.get("from", ""),
+                "date": header_values.get("date", "")
+            })
+
+        return {
+            "query": query,
+            "result_count": len(results),
+            "messages": results
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gmail search failed: {str(error)}"
+        )
+@app.post("/gmail/messages/{message_id}/analyze")
+def analyze_gmail_message(message_id: str):
+    """Analyze one selected Gmail message without creating duplicate cases."""
+
+    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
+    project_root = Path(__file__).resolve().parent.parent
+    token_path = project_root / "token.json"
+    temp_path = None
+
+    if not token_path.exists():
+        raise HTTPException(
+            status_code=401,
+            detail="Gmail token.json was not found. Complete Gmail authorization first."
+        )
+
+    try:
+        credentials = Credentials.from_authorized_user_file(
+            str(token_path),
+            scopes=[gmail_scope]
+        )
+
+        if not credentials.has_scopes([gmail_scope]):
+            raise HTTPException(
+                status_code=403,
+                detail="Gmail authorization does not include the required read-only scope."
+            )
+
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(credentials.to_json())
+
+        if not credentials.valid:
+            raise HTTPException(
+                status_code=401,
+                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
+            )
+
+        gmail_service = build(
+            "gmail",
+            "v1",
+            credentials=credentials
+        )
+
+        raw_message = (
+            gmail_service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=message_id,
+                format="raw"
+            )
+            .execute()
+        )
+
+        raw_data = raw_message.get("raw")
+        if not raw_data:
+            raise HTTPException(
+                status_code=404,
+                detail="Gmail message was not found or did not contain raw email data."
+            )
+
+        email_bytes = base64.urlsafe_b64decode(
+            raw_data + "=" * (-len(raw_data) % 4)
+        )
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=".eml",
+            delete=False
+        ) as temp_file:
+            temp_file.write(email_bytes)
+            temp_path = temp_file.name
+
+        result = parse_eml(temp_path)
+        evidence_hash = calculate_sha256(email_bytes)
+
+        # Check for an existing case before creating any new blockchain record.
+        existing_case = get_case_by_evidence_hash(evidence_hash)
+
+        if existing_case:
+            verification = blockchain_ledger.verify_record(
+                existing_case.transaction_hash,
+                existing_case.evidence_sha256,
+                existing_case.report_sha256
+            )
+
+            result["already_analyzed"] = True
+            result["evidence_integrity"] = {
+                "case_id": existing_case.case_id,
+                "evidence_sha256": existing_case.evidence_sha256,
+                "report_sha256": existing_case.report_sha256,
+                "transaction_hash": existing_case.transaction_hash,
+                "block_number": existing_case.block_number,
+                "blockchain": {
+                    "transaction_hash": existing_case.transaction_hash,
+                    "block_number": existing_case.block_number,
+                    "verification_status": verification["verification_status"],
+                    "evidence_match": verification["evidence_match"],
+                    "report_match": verification["report_match"]
+                }
+            }
+
+            return result
+
+        integrity_record = build_integrity_record(
+            evidence_hash,
+            result
+        )
+
+        blockchain_record = blockchain_ledger.create_record(
+            integrity_record["case_id"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"]
+        )
+
+        verification = blockchain_ledger.verify_record(
+            blockchain_record["transaction_hash"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"]
+        )
+
+        create_case(
+            integrity_record["case_id"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"],
+            blockchain_record["transaction_hash"],
+            blockchain_record["block_number"]
+        )
+
+        result["already_analyzed"] = False
+        result["evidence_integrity"] = {
+            "case_id": integrity_record["case_id"],
+            "evidence_sha256": integrity_record["evidence_sha256"],
+            "report_sha256": integrity_record["report_sha256"],
+            "hash_algorithm": integrity_record["hash_algorithm"],
+            "created_at": integrity_record["created_at"],
+            "blockchain": {
+                "transaction_hash": blockchain_record["transaction_hash"],
+                "block_number": blockchain_record["block_number"],
+                "verification_status": verification["verification_status"],
+                "evidence_match": verification["evidence_match"],
+                "report_match": verification["report_match"]
+            }
+        }
+
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gmail message analysis failed: {str(error)}"
+        )
+
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 @app.post("/analyze-gmail-test")
 def analyze_gmail_test_email():
     """
