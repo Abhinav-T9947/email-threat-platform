@@ -534,6 +534,14 @@
                 Analyze Email
             </button>
 
+                        <button
+                type="button"
+                id="analyzeGmailButton"
+                onclick="analyzeGmailTestEmail()"
+            >
+                Analyze Gmail Test Email
+            </button>
+
         </div>
 
         <div
@@ -3439,7 +3447,44 @@ async function verifyBlockchainIntegrity(
     }
 
 }
+async function analyzeGmailTestEmail() {
+    const button = document.getElementById("analyzeGmailButton");
 
+    button.disabled = true;
+    button.textContent = "Analyzing Gmail...";
+
+    try {
+        const response = await fetch(`${API_URL}/analyze-gmail-test`, {
+            method: "POST"
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.detail || "Gmail analysis failed.");
+        }
+
+        displayThreatOverview(result);
+        displayBlockchainIntegrity(result);
+        displayAuthentication(result);
+        displayEmailInformation(result);
+        displaySenderAnalysis(result);
+        displayIPIntelligence(result);
+        displayUrlIntelligence(result);
+        displayRelayChain(result);
+        displayAttachmentIntelligence(result);
+        displayThreatReasons(result);
+        displayRawResult(result);
+
+        alert("Gmail test email analyzed successfully.");
+    } catch (error) {
+        console.error("Gmail analysis error:", error);
+        alert(`Gmail analysis failed: ${error.message}`);
+    } finally {
+        button.disabled = false;
+        button.textContent = "Analyze Gmail Test Email";
+    }
+}
 </script>
 
 </body>

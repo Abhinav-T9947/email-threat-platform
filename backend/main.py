@@ -1,3 +1,11 @@
+import base64
+from pathlib import Path
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+
+
 from fastapi import (
     FastAPI,
     UploadFile,
@@ -297,7 +305,193 @@ async def analyze_email(
                 temporary_path
             )
 
+# ============================================================
+# READ-ONLY GMAIL TEST EMAIL ANALYSIS
+# ============================================================
 
+@app.post("/analyze-gmail-test")
+def analyze_gmail_test_email():
+    """
+    Find and analyze a Gmail message with the exact test subject.
+    Requires the Gmail read-only OAuth scope.
+    """
+
+    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
+    test_subject = "MailSentinel Ingestion Test"
+
+    project_root = Path(__file__).resolve().parent.parent
+    token_path = project_root / "token.json"
+
+    if not token_path.exists():
+        raise HTTPException(
+            status_code=401,
+            detail="Gmail token.json was not found. Complete Gmail authorization first."
+        )
+
+    temp_path = None
+
+    try:
+        credentials = Credentials.from_authorized_user_file(
+            str(token_path),
+            scopes=[gmail_scope]
+        )
+
+        if not credentials.has_scopes([gmail_scope]):
+            raise HTTPException(
+                status_code=403,
+                detail="Gmail authorization does not include the required read-only scope."
+            )
+
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+
+            with open(token_path, "w", encoding="utf-8") as token_file:
+                token_file.write(credentials.to_json())
+
+        if not credentials.valid:
+            raise HTTPException(
+                status_code=401,
+                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
+            )
+
+        gmail_service = build(
+            "gmail",
+            "v1",
+            credentials=credentials
+        )
+
+        search_response = (
+            gmail_service.users()
+            .messages()
+            .list(
+                userId="me",
+                q='subject:"MailSentinel Ingestion Test"',
+                maxResults=10
+            )
+            .execute()
+        )
+
+        messages = search_response.get("messages", [])
+        matching_message_id = None
+
+        for message in messages:
+            message_details = (
+                gmail_service.users()
+                .messages()
+                .get(
+                    userId="me",
+                    id=message["id"],
+                    format="full"
+                )
+                .execute()
+            )
+
+            headers = message_details.get("payload", {}).get("headers", [])
+
+            subject = next(
+                (
+                    header.get("value", "").strip()
+                    for header in headers
+                    if header.get("name", "").lower() == "subject"
+                ),
+                ""
+            )
+
+            if subject == test_subject:
+                matching_message_id = message["id"]
+                break
+
+        if not matching_message_id:
+            raise HTTPException(
+                status_code=404,
+                detail=(
+                    "No Gmail message with the exact subject "
+                    "'MailSentinel Ingestion Test' was found."
+                )
+            )
+
+        raw_message = (
+            gmail_service.users()
+            .messages()
+            .get(
+                userId="me",
+                id=matching_message_id,
+                format="raw"
+            )
+            .execute()
+        )
+
+        raw_data = raw_message["raw"]
+        email_bytes = base64.urlsafe_b64decode(
+            raw_data + "=" * (-len(raw_data) % 4)
+        )
+
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            suffix=".eml",
+            delete=False
+        ) as temp_file:
+            temp_file.write(email_bytes)
+            temp_path = temp_file.name
+
+        result = parse_eml(temp_path)
+
+        evidence_hash = calculate_sha256(email_bytes)
+
+        integrity_record = build_integrity_record(
+            evidence_hash,
+            result
+        )
+
+        blockchain_record = blockchain_ledger.create_record(
+            integrity_record["case_id"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"]
+        )
+
+        verification = blockchain_ledger.verify_record(
+            blockchain_record["transaction_hash"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"]
+        )
+
+        create_case(
+            integrity_record["case_id"],
+            integrity_record["evidence_sha256"],
+            integrity_record["report_sha256"],
+            blockchain_record["transaction_hash"],
+            blockchain_record["block_number"]
+        )
+
+        result["evidence_integrity"] = {
+            "case_id": integrity_record["case_id"],
+            "evidence_sha256": integrity_record["evidence_sha256"],
+            "report_sha256": integrity_record["report_sha256"],
+            "hash_algorithm": integrity_record["hash_algorithm"],
+            "created_at": integrity_record["created_at"],
+            "blockchain": {
+                "transaction_hash": blockchain_record["transaction_hash"],
+                "block_number": blockchain_record["block_number"],
+                "verification_status": verification["verification_status"],
+                "evidence_match": verification["evidence_match"],
+                "report_match": verification["report_match"]
+            }
+        }
+
+        return result
+
+    except HTTPException:
+        raise
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Gmail test-email analysis failed: {str(error)}"
+        )
+
+    finally:
+        if temp_path and os.path.exists(temp_path):
+            os.remove(temp_path)
 # ============================================================
 # MANUAL BLOCKCHAIN INTEGRITY VERIFICATION
 # ============================================================

@@ -63,3 +63,7 @@ token.json
 # Local forensic test data and backups
 /email_forensics/*.bak
 /email_forensics/gmail_ingested_test.eml
+
+# Local working backups
+/backend/main.py.bak
+/frontend/index.html.bak
