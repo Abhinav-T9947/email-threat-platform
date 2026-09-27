@@ -59,3 +59,7 @@ Thumbs.db
 # Gmail OAuth credentials
 credentials.json
 token.json
+
+# Local forensic test data and backups
+/email_forensics/*.bak
+/email_forensics/gmail_ingested_test.eml
