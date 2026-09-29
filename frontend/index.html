@@ -555,6 +555,13 @@
         <button type="button" id="disconnectGmailButton" onclick="disconnectGmail()" hidden>
             Disconnect
         </button>
+    <button type="button" id="deleteCasesButton" onclick="deleteMyCases()" hidden>
+    Delete My Case Records
+</button>
+
+<button type="button" id="deleteAccountButton" onclick="deleteMyAccount()" hidden>
+    Delete My Account and Data
+</button>
     </div>
 
     <h3>Search Gmail (Read-only)</h3>
@@ -3665,11 +3672,12 @@ button.textContent = result.already_analyzed
         button.textContent = "Retry analysis";
     }
 }
-
 async function loadGmailAccountStatus() {
     const statusElement = document.getElementById("gmailAccountStatus");
     const connectButton = document.getElementById("connectGmailButton");
     const disconnectButton = document.getElementById("disconnectGmailButton");
+    const deleteCasesButton = document.getElementById("deleteCasesButton");
+    const deleteAccountButton = document.getElementById("deleteAccountButton");
 
     try {
         const response = await fetch(`${API_URL}/auth/status`, {
@@ -3686,15 +3694,21 @@ async function loadGmailAccountStatus() {
             statusElement.textContent = `Connected as ${data.email}`;
             connectButton.hidden = true;
             disconnectButton.hidden = false;
+            deleteCasesButton.hidden = false;
+            deleteAccountButton.hidden = false;
         } else {
             statusElement.textContent = "No Gmail account connected.";
             connectButton.hidden = false;
             disconnectButton.hidden = true;
+            deleteCasesButton.hidden = true;
+            deleteAccountButton.hidden = true;
         }
     } catch (error) {
         statusElement.textContent = "Unable to check Gmail connection.";
         connectButton.hidden = false;
         disconnectButton.hidden = true;
+        deleteCasesButton.hidden = true;
+        deleteAccountButton.hidden = true;
         console.error("Gmail account status error:", error);
     }
 }
@@ -3729,7 +3743,75 @@ async function disconnectGmail() {
         disconnectButton.disabled = false;
     }
 }
+async function deleteMyCases() {
+    const button = document.getElementById("deleteCasesButton");
 
+    const confirmed = confirm(
+        "Delete all your saved forensic case records? This cannot be undone. Blockchain transaction records will remain."
+    );
+
+    if (!confirmed) return;
+
+    button.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/cases`, {
+            method: "DELETE",
+            credentials: "include"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Could not delete case records.");
+        }
+
+        alert(`Deleted ${data.deleted_cases} case record(s).`);
+    } catch (error) {
+        alert(error.message);
+        console.error("Delete cases error:", error);
+    } finally {
+        button.disabled = false;
+    }
+}
+
+
+async function deleteMyAccount() {
+    const button = document.getElementById("deleteAccountButton");
+
+    const confirmed = confirm(
+        "Delete your MailSentinel account data? This removes your saved case records and stored Gmail credentials. It cannot be undone. Blockchain transaction records will remain, and Google authorization will not be revoked automatically."
+    );
+
+    if (!confirmed) return;
+
+    button.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/auth/account`, {
+            method: "DELETE",
+            credentials: "include"
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.detail || "Could not delete account data.");
+        }
+
+        document.getElementById("gmailSearchResults").replaceChildren();
+        document.getElementById("gmailSearchMessage").textContent = "";
+
+        await loadGmailAccountStatus();
+
+        alert("Your MailSentinel account data was deleted. To revoke Google access, remove MailSentinel from your Google Account's third-party connections.");
+    } catch (error) {
+        alert(error.message);
+        console.error("Delete account error:", error);
+    } finally {
+        button.disabled = false;
+    }
+}
 document.addEventListener("DOMContentLoaded", loadGmailAccountStatus);
 
 </script>

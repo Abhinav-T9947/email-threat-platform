@@ -50,7 +50,9 @@ from backend.database import (
     get_case,
     get_case_by_evidence_hash,
     save_gmail_account,
-    get_gmail_account
+    get_gmail_account,
+    delete_cases_for_owner,
+    delete_gmail_account
 )
 
 # ============================================================
@@ -299,6 +301,31 @@ def auth_status(request: FastAPIRequest):
 def auth_logout(request: FastAPIRequest):
     request.session.clear()
     return {"connected": False}
+
+@app.delete("/cases")
+def delete_my_cases(request: FastAPIRequest):
+    owner_google_sub = get_current_google_sub(request)
+    deleted_count = delete_cases_for_owner(owner_google_sub)
+
+    return {
+        "deleted_cases": deleted_count
+    }
+
+
+@app.delete("/auth/account")
+def delete_my_account(request: FastAPIRequest):
+    google_sub = get_current_google_sub(request)
+
+    deleted_cases = delete_cases_for_owner(google_sub)
+    delete_gmail_account(google_sub)
+
+    request.session.clear()
+
+    return {
+        "account_deleted": True,
+        "deleted_cases": deleted_cases,
+        "message": "Stored account credentials and case records were deleted."
+    }
 # ============================================================
 # ROOT ENDPOINT
 # ============================================================

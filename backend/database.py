@@ -227,6 +227,41 @@ def get_gmail_account(google_sub):
 
     finally:
         db.close()
+
+def delete_cases_for_owner(owner_google_sub):
+    db = SessionLocal()
+
+    try:
+        deleted_count = (
+            db.query(ForensicCase)
+            .filter(
+                ForensicCase.owner_google_sub == owner_google_sub
+            )
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+        return deleted_count
+
+    finally:
+        db.close()
+
+
+def delete_gmail_account(google_sub):
+    db = SessionLocal()
+
+    try:
+        deleted_count = (
+            db.query(GmailAccount)
+            .filter(GmailAccount.google_sub == google_sub)
+            .delete(synchronize_session=False)
+        )
+
+        db.commit()
+        return deleted_count
+
+    finally:
+        db.close()
 if __name__ == "__main__":
 
     print(
