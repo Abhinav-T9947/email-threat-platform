@@ -545,6 +545,18 @@
     id="gmailSearchArea"
     style="margin-top: 20px; width: 100%;"
 >
+    <h3>Gmail Account</h3>
+
+    <div id="gmailAccountPanel" style="margin: 10px 0 18px; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px;">
+        <p id="gmailAccountStatus" role="status">Checking Gmail connection...</p>
+        <button type="button" id="connectGmailButton" onclick="connectGmail()" hidden>
+            Connect Gmail
+        </button>
+        <button type="button" id="disconnectGmailButton" onclick="disconnectGmail()" hidden>
+            Disconnect
+        </button>
+    </div>
+
     <h3>Search Gmail (Read-only)</h3>
 
     <label for="gmailSearchDays">
@@ -1304,7 +1316,7 @@
 
 <script>
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://localhost:8000";
 
 console.log(
     "EMAIL THREAT PLATFORM FRONTEND v2.1 LOADED"
@@ -3075,8 +3087,9 @@ async function analyzeEmail() {
             await fetch(
                 `${API_URL}/analyze-email`,
                 {
-                    method: "POST",
-                    body: formData
+                     method: "POST",
+                    body: formData,
+                    credentials: "include"
                 }
             );
 
@@ -3539,7 +3552,8 @@ const query = `newer_than:${days}d`;
 
     try {
         const response = await fetch(
-            `${API_URL}/gmail/search?query=${encodeURIComponent(query)}`
+            `${API_URL}/gmail/search?query=${encodeURIComponent(query)}`,
+            { credentials: "include" }
         );
 
         const data = await response.json();
@@ -3608,7 +3622,8 @@ async function analyzeSelectedGmailMessage(messageId, button) {
         const response = await fetch(
             `${API_URL}/gmail/messages/${encodeURIComponent(messageId)}/analyze`,
             {
-                method: "POST"
+                method: "POST",
+                credentials: "include"
             }
         );
 
@@ -3650,6 +3665,73 @@ button.textContent = result.already_analyzed
         button.textContent = "Retry analysis";
     }
 }
+
+async function loadGmailAccountStatus() {
+    const statusElement = document.getElementById("gmailAccountStatus");
+    const connectButton = document.getElementById("connectGmailButton");
+    const disconnectButton = document.getElementById("disconnectGmailButton");
+
+    try {
+        const response = await fetch(`${API_URL}/auth/status`, {
+            credentials: "include"
+        });
+
+        if (!response.ok) {
+            throw new Error("Could not check Gmail connection.");
+        }
+
+        const data = await response.json();
+
+        if (data.connected) {
+            statusElement.textContent = `Connected as ${data.email}`;
+            connectButton.hidden = true;
+            disconnectButton.hidden = false;
+        } else {
+            statusElement.textContent = "No Gmail account connected.";
+            connectButton.hidden = false;
+            disconnectButton.hidden = true;
+        }
+    } catch (error) {
+        statusElement.textContent = "Unable to check Gmail connection.";
+        connectButton.hidden = false;
+        disconnectButton.hidden = true;
+        console.error("Gmail account status error:", error);
+    }
+}
+
+function connectGmail() {
+    window.location.href = `${API_URL}/auth/google/login`;
+}
+
+async function disconnectGmail() {
+    const statusElement = document.getElementById("gmailAccountStatus");
+    const disconnectButton = document.getElementById("disconnectGmailButton");
+
+    disconnectButton.disabled = true;
+
+    try {
+        const response = await fetch(`${API_URL}/auth/logout`, {
+            method: "POST",
+            credentials: "include"
+        });
+
+        if (!response.ok) {
+            throw new Error("Could not disconnect Gmail.");
+        }
+
+        document.getElementById("gmailSearchResults").replaceChildren();
+        document.getElementById("gmailSearchMessage").textContent = "";
+        await loadGmailAccountStatus();
+    } catch (error) {
+        statusElement.textContent = error.message;
+        console.error("Gmail disconnect error:", error);
+    } finally {
+        disconnectButton.disabled = false;
+    }
+}
+
+document.addEventListener("DOMContentLoaded", loadGmailAccountStatus);
+
 </script>
 
 </body>

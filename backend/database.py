@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, String, Integer, DateTime
+from sqlalchemy import create_engine, Column, String, Integer, DateTime, text
 from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime, timezone
 import os
@@ -49,6 +49,8 @@ class ForensicCase(Base):
         index=True
     )
 
+    owner_google_sub = Column(String, nullable=True, index=True)
+
     case_id = Column(
         String,
         unique=True,
@@ -81,12 +83,34 @@ class ForensicCase(Base):
         nullable=False
     )
 
+class GmailAccount(Base):
+    __tablename__ = "gmail_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    google_sub = Column(String, unique=True, nullable=False, index=True)
+    email = Column(String, nullable=False, index=True)
+    encrypted_credentials = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
 
 def initialize_database():
 
-    Base.metadata.create_all(
-        bind=engine
-    )
+    Base.metadata.create_all(bind=engine)
+
+    # Add the owner column to existing databases without deleting cases.
+    with engine.begin() as connection:
+        columns = {
+            row[1]
+            for row in connection.execute(
+                text("PRAGMA table_info(forensic_cases)")
+            )
+        }
+
+        if "owner_google_sub" not in columns:
+            connection.execute(
+                text("ALTER TABLE forensic_cases ADD COLUMN owner_google_sub VARCHAR")
+            )
+
 
 
 def create_case(
@@ -94,7 +118,8 @@ def create_case(
     evidence_sha256,
     report_sha256,
     transaction_hash,
-    block_number
+    block_number,
+    owner_google_sub
 ):
 
     db = SessionLocal()
@@ -103,6 +128,7 @@ def create_case(
 
         case = ForensicCase(
             case_id=case_id,
+            owner_google_sub=owner_google_sub,
             evidence_sha256=evidence_sha256,
             report_sha256=report_sha256,
             transaction_hash=transaction_hash,
@@ -125,40 +151,82 @@ def create_case(
         db.close()
 
 
-def get_case(case_id):
+def get_case(case_id, owner_google_sub):
 
-    db = SessionLocal()
-
-    try:
-
-        return (
-            db.query(
-                ForensicCase
-            )
-            .filter(
-                ForensicCase.case_id == case_id
-            )
-            .first()
-        )
-
-    finally:
-
-        db.close()
-def get_case_by_evidence_hash(evidence_sha256):
     db = SessionLocal()
 
     try:
         return (
             db.query(ForensicCase)
             .filter(
-                ForensicCase.evidence_sha256 == evidence_sha256
+                ForensicCase.case_id == case_id,
+                ForensicCase.owner_google_sub == owner_google_sub
             )
             .first()
         )
 
     finally:
         db.close()
+def get_case_by_evidence_hash(evidence_sha256, owner_google_sub):
+    db = SessionLocal()
 
+    try:
+        return (
+            db.query(ForensicCase)
+            .filter(
+                ForensicCase.evidence_sha256 == evidence_sha256,
+                ForensicCase.owner_google_sub == owner_google_sub
+            )
+            .first()
+        )
+
+    finally:
+        db.close()
+def save_gmail_account(google_sub, email, encrypted_credentials):
+    db = SessionLocal()
+    now = datetime.now(timezone.utc)
+
+    try:
+        account = (
+            db.query(GmailAccount)
+            .filter(GmailAccount.google_sub == google_sub)
+            .first()
+        )
+
+        if account:
+            account.email = email
+            account.encrypted_credentials = encrypted_credentials
+            account.updated_at = now
+        else:
+            account = GmailAccount(
+                google_sub=google_sub,
+                email=email,
+                encrypted_credentials=encrypted_credentials,
+                created_at=now,
+                updated_at=now,
+            )
+            db.add(account)
+
+        db.commit()
+        db.refresh(account)
+        return account
+
+    finally:
+        db.close()
+
+
+def get_gmail_account(google_sub):
+    db = SessionLocal()
+
+    try:
+        return (
+            db.query(GmailAccount)
+            .filter(GmailAccount.google_sub == google_sub)
+            .first()
+        )
+
+    finally:
+        db.close()
 if __name__ == "__main__":
 
     print(

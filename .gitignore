@@ -67,3 +67,12 @@ token.json
 # Local working backups
 /backend/main.py.bak
 /frontend/index.html.bak
+
+google-oauth-web.json
+
+# Local backup snapshots (keep out of Git)
+/backend/*.bak
+/backend/*.backup
+/backend/*-backup
+/backend/*.db.*.bak
+/frontend/*.bak

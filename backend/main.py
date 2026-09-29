@@ -19,6 +19,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import tempfile
 import os
+import json
+
+from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+from fastapi import Request as FastAPIRequest
+from fastapi.responses import RedirectResponse
+from google.oauth2 import id_token
+from google_auth_oauthlib.flow import Flow
+from starlette.middleware.sessions import SessionMiddleware
 
 from email_forensics.eml_parser import parse_eml
 
@@ -39,10 +48,31 @@ from backend.database import (
     initialize_database,
     create_case,
     get_case,
-    get_case_by_evidence_hash
+    get_case_by_evidence_hash,
+    save_gmail_account,
+    get_gmail_account
 )
 
+# ============================================================
+# GOOGLE OAUTH CONFIGURATION
+# ============================================================
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+load_dotenv(PROJECT_ROOT / ".env")
+
+GOOGLE_OAUTH_CLIENT_FILE = (
+    PROJECT_ROOT / os.environ["GOOGLE_OAUTH_CLIENT_FILE"]
+)
+
+GOOGLE_REDIRECT_URI = "http://localhost:8000/auth/google/callback"
+
+GMAIL_OAUTH_SCOPES = [
+    "openid",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "https://www.googleapis.com/auth/userinfo.profile",
+    "https://www.googleapis.com/auth/gmail.readonly",
+]
 # ============================================================
 # FASTAPI APPLICATION
 # ============================================================
@@ -53,7 +83,12 @@ app = FastAPI(
     version="1.0.0"
 )
 
-
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ["MAILSENTINEL_SESSION_SECRET"],
+    same_site="lax",
+    https_only=False,
+)
 # ============================================================
 # CORS CONFIGURATION
 # ============================================================
@@ -78,7 +113,192 @@ blockchain_ledger = BlockchainLedger()
 
 initialize_database()
 
+def get_current_google_sub(request: FastAPIRequest):
+    google_sub = request.session.get("google_sub")
 
+    if not google_sub or not get_gmail_account(google_sub):
+        request.session.clear()
+        raise HTTPException(
+            status_code=401,
+            detail="Connect your Google account first."
+        )
+
+    return google_sub
+
+
+def get_current_gmail_credentials(request: FastAPIRequest):
+    google_sub = request.session.get("google_sub")
+
+    if not google_sub:
+        raise HTTPException(
+            status_code=401,
+            detail="Connect your Gmail account first."
+        )
+
+    account = get_gmail_account(google_sub)
+
+    if not account:
+        request.session.clear()
+        raise HTTPException(
+            status_code=401,
+            detail="Gmail connection not found. Please connect again."
+        )
+
+    try:
+        cipher = Fernet(
+            os.environ["MAILSENTINEL_TOKEN_KEY"].encode("utf-8")
+        )
+
+        credentials_json = cipher.decrypt(
+            account.encrypted_credentials.encode("utf-8")
+        ).decode("utf-8")
+
+        credentials = Credentials.from_authorized_user_info(
+            json.loads(credentials_json),
+            scopes=GMAIL_OAUTH_SCOPES
+        )
+
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+
+            encrypted_credentials = cipher.encrypt(
+                credentials.to_json().encode("utf-8")
+            ).decode("utf-8")
+
+            save_gmail_account(
+                google_sub,
+                account.email,
+                encrypted_credentials
+            )
+
+        if not credentials.valid:
+            raise HTTPException(
+                status_code=401,
+                detail="Gmail authorization expired. Please connect again."
+            )
+
+        return credentials
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        raise HTTPException(
+            status_code=401,
+            detail="Could not load Gmail authorization. Please connect Gmail again."
+        )
+@app.get("/auth/google/login")
+def google_login(request: FastAPIRequest):
+    flow = Flow.from_client_secrets_file(
+        str(GOOGLE_OAUTH_CLIENT_FILE),
+        scopes=GMAIL_OAUTH_SCOPES,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+
+    request.session["oauth_state"] = state
+    request.session["oauth_code_verifier"] = flow.code_verifier
+
+    return RedirectResponse(authorization_url)
+
+@app.get("/auth/google/callback")
+def google_callback(request: FastAPIRequest):
+    expected_state = request.session.get("oauth_state")
+    received_state = request.query_params.get("state")
+
+    if not expected_state or received_state != expected_state:
+        request.session.clear()
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid OAuth state. Please try connecting Gmail again."
+        )
+
+    if request.query_params.get("error"):
+        request.session.clear()
+        raise HTTPException(
+            status_code=400,
+            detail="Google authorization was not completed."
+        )
+
+    flow = Flow.from_client_secrets_file(
+        str(GOOGLE_OAUTH_CLIENT_FILE),
+        scopes=GMAIL_OAUTH_SCOPES,
+        state=expected_state,
+        redirect_uri=GOOGLE_REDIRECT_URI,
+    )
+
+    flow.code_verifier = request.session.get("oauth_code_verifier")
+    if not flow.code_verifier:
+        request.session.clear()
+        raise HTTPException(
+            status_code=400,
+            detail="OAuth session expired. Please connect Gmail again."
+        )
+
+    flow.fetch_token(authorization_response=str(request.url))
+    credentials = flow.credentials
+
+    identity = id_token.verify_oauth2_token(
+        credentials.id_token,
+        Request(),
+        audience=flow.client_config["client_id"],
+    )
+
+    google_sub = identity["sub"]
+    email = identity.get("email")
+
+    if not email or not identity.get("email_verified"):
+        raise HTTPException(
+            status_code=400,
+            detail="Google did not provide a verified email address."
+        )
+
+    cipher = Fernet(
+        os.environ["MAILSENTINEL_TOKEN_KEY"].encode("utf-8")
+    )
+
+    encrypted_credentials = cipher.encrypt(
+        credentials.to_json().encode("utf-8")
+    ).decode("utf-8")
+
+    save_gmail_account(
+        google_sub,
+        email,
+        encrypted_credentials
+    )
+
+    request.session.clear()
+    request.session["google_sub"] = google_sub
+
+    return RedirectResponse(
+        "http://localhost:5500/index.html?gmail=connected"
+    )
+
+@app.get("/auth/status")
+def auth_status(request: FastAPIRequest):
+    google_sub = request.session.get("google_sub")
+
+    if not google_sub:
+        return {"connected": False, "email": None}
+
+    account = get_gmail_account(google_sub)
+
+    if not account:
+        request.session.clear()
+        return {"connected": False, "email": None}
+
+    return {"connected": True, "email": account.email}
+
+
+@app.post("/auth/logout")
+def auth_logout(request: FastAPIRequest):
+    request.session.clear()
+    return {"connected": False}
 # ============================================================
 # ROOT ENDPOINT
 # ============================================================
@@ -98,8 +318,10 @@ def root():
 
 @app.post("/analyze-email")
 async def analyze_email(
+    request: FastAPIRequest,
     file: UploadFile = File(...)
 ):
+    owner_google_sub = get_current_google_sub(request)
 
     # --------------------------------------------------------
     # Validate file
@@ -222,7 +444,8 @@ async def analyze_email(
             ],
             blockchain_record[
                 "block_number"
-            ]
+            ],
+            owner_google_sub=owner_google_sub
         )
 
         # ----------------------------------------------------
@@ -312,46 +535,17 @@ async def analyze_email(
 # ============================================================
 @app.get("/gmail/search")
 def search_gmail(
+    request: FastAPIRequest,
     query: str = Query(
         default="newer_than:7d",
         max_length=200,
         description="Gmail search query, such as newer_than:7d or label:inbox"
     )
 ):
-    """Search Gmail read-only and return basic message details."""
-
-    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
-    project_root = Path(__file__).resolve().parent.parent
-    token_path = project_root / "token.json"
-
-    if not token_path.exists():
-        raise HTTPException(
-            status_code=401,
-            detail="Gmail token.json was not found. Complete Gmail authorization first."
-        )
+    """Search the connected user's Gmail read-only."""
 
     try:
-        credentials = Credentials.from_authorized_user_file(
-            str(token_path),
-            scopes=[gmail_scope]
-        )
-
-        if not credentials.has_scopes([gmail_scope]):
-            raise HTTPException(
-                status_code=403,
-                detail="Gmail authorization does not include the required read-only scope."
-            )
-
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-            with open(token_path, "w", encoding="utf-8") as token_file:
-                token_file.write(credentials.to_json())
-
-        if not credentials.valid:
-            raise HTTPException(
-                status_code=401,
-                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
-            )
+        credentials = get_current_gmail_credentials(request)
 
         gmail_service = build(
             "gmail",
@@ -408,48 +602,23 @@ def search_gmail(
     except HTTPException:
         raise
 
-    except Exception as error:
+    except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"Gmail search failed: {str(error)}"
+            detail="Gmail search failed. Please try again."
         )
 @app.post("/gmail/messages/{message_id}/analyze")
-def analyze_gmail_message(message_id: str):
-    """Analyze one selected Gmail message without creating duplicate cases."""
+def analyze_gmail_message(
+    message_id: str,
+    request: FastAPIRequest
+):
+    """Analyze a selected message from the connected Gmail account."""
 
-    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
-    project_root = Path(__file__).resolve().parent.parent
-    token_path = project_root / "token.json"
     temp_path = None
 
-    if not token_path.exists():
-        raise HTTPException(
-            status_code=401,
-            detail="Gmail token.json was not found. Complete Gmail authorization first."
-        )
-
     try:
-        credentials = Credentials.from_authorized_user_file(
-            str(token_path),
-            scopes=[gmail_scope]
-        )
-
-        if not credentials.has_scopes([gmail_scope]):
-            raise HTTPException(
-                status_code=403,
-                detail="Gmail authorization does not include the required read-only scope."
-            )
-
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-            with open(token_path, "w", encoding="utf-8") as token_file:
-                token_file.write(credentials.to_json())
-
-        if not credentials.valid:
-            raise HTTPException(
-                status_code=401,
-                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
-            )
+        credentials = get_current_gmail_credentials(request)
+        owner_google_sub = get_current_google_sub(request)
 
         gmail_service = build(
             "gmail",
@@ -469,6 +638,7 @@ def analyze_gmail_message(message_id: str):
         )
 
         raw_data = raw_message.get("raw")
+
         if not raw_data:
             raise HTTPException(
                 status_code=404,
@@ -490,8 +660,8 @@ def analyze_gmail_message(message_id: str):
         result = parse_eml(temp_path)
         evidence_hash = calculate_sha256(email_bytes)
 
-        # Check for an existing case before creating any new blockchain record.
-        existing_case = get_case_by_evidence_hash(evidence_hash)
+        # Reuse an existing case when this evidence was already analyzed.
+        existing_case = get_case_by_evidence_hash(evidence_hash, owner_google_sub)
 
         if existing_case:
             verification = blockchain_ledger.verify_record(
@@ -540,7 +710,8 @@ def analyze_gmail_message(message_id: str):
             integrity_record["evidence_sha256"],
             integrity_record["report_sha256"],
             blockchain_record["transaction_hash"],
-            blockchain_record["block_number"]
+            blockchain_record["block_number"],
+            owner_google_sub=owner_google_sub
         )
 
         result["already_analyzed"] = False
@@ -564,10 +735,10 @@ def analyze_gmail_message(message_id: str):
     except HTTPException:
         raise
 
-    except Exception as error:
+    except Exception:
         raise HTTPException(
             status_code=500,
-            detail=f"Gmail message analysis failed: {str(error)}"
+            detail="Gmail message analysis failed. Please try again."
         )
 
     finally:
@@ -576,187 +747,15 @@ def analyze_gmail_message(message_id: str):
 @app.post("/analyze-gmail-test")
 def analyze_gmail_test_email():
     """
-    Find and analyze a Gmail message with the exact test subject.
-    Requires the Gmail read-only OAuth scope.
+    Retired legacy endpoint: it used token.json rather than the signed-in
+    account session, so it must not create account-owned case records.
     """
+    raise HTTPException(
+        status_code=410,
+        detail="This legacy test endpoint is disabled. Use the signed-in Gmail analysis feature."
+    )
 
-    gmail_scope = "https://www.googleapis.com/auth/gmail.readonly"
-    test_subject = "MailSentinel Ingestion Test"
 
-    project_root = Path(__file__).resolve().parent.parent
-    token_path = project_root / "token.json"
-
-    if not token_path.exists():
-        raise HTTPException(
-            status_code=401,
-            detail="Gmail token.json was not found. Complete Gmail authorization first."
-        )
-
-    temp_path = None
-
-    try:
-        credentials = Credentials.from_authorized_user_file(
-            str(token_path),
-            scopes=[gmail_scope]
-        )
-
-        if not credentials.has_scopes([gmail_scope]):
-            raise HTTPException(
-                status_code=403,
-                detail="Gmail authorization does not include the required read-only scope."
-            )
-
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-
-            with open(token_path, "w", encoding="utf-8") as token_file:
-                token_file.write(credentials.to_json())
-
-        if not credentials.valid:
-            raise HTTPException(
-                status_code=401,
-                detail="Gmail authorization is expired or invalid. Reauthorize Gmail."
-            )
-
-        gmail_service = build(
-            "gmail",
-            "v1",
-            credentials=credentials
-        )
-
-        search_response = (
-            gmail_service.users()
-            .messages()
-            .list(
-                userId="me",
-                q='subject:"MailSentinel Ingestion Test"',
-                maxResults=10
-            )
-            .execute()
-        )
-
-        messages = search_response.get("messages", [])
-        matching_message_id = None
-
-        for message in messages:
-            message_details = (
-                gmail_service.users()
-                .messages()
-                .get(
-                    userId="me",
-                    id=message["id"],
-                    format="full"
-                )
-                .execute()
-            )
-
-            headers = message_details.get("payload", {}).get("headers", [])
-
-            subject = next(
-                (
-                    header.get("value", "").strip()
-                    for header in headers
-                    if header.get("name", "").lower() == "subject"
-                ),
-                ""
-            )
-
-            if subject == test_subject:
-                matching_message_id = message["id"]
-                break
-
-        if not matching_message_id:
-            raise HTTPException(
-                status_code=404,
-                detail=(
-                    "No Gmail message with the exact subject "
-                    "'MailSentinel Ingestion Test' was found."
-                )
-            )
-
-        raw_message = (
-            gmail_service.users()
-            .messages()
-            .get(
-                userId="me",
-                id=matching_message_id,
-                format="raw"
-            )
-            .execute()
-        )
-
-        raw_data = raw_message["raw"]
-        email_bytes = base64.urlsafe_b64decode(
-            raw_data + "=" * (-len(raw_data) % 4)
-        )
-
-        with tempfile.NamedTemporaryFile(
-            mode="wb",
-            suffix=".eml",
-            delete=False
-        ) as temp_file:
-            temp_file.write(email_bytes)
-            temp_path = temp_file.name
-
-        result = parse_eml(temp_path)
-
-        evidence_hash = calculate_sha256(email_bytes)
-
-        integrity_record = build_integrity_record(
-            evidence_hash,
-            result
-        )
-
-        blockchain_record = blockchain_ledger.create_record(
-            integrity_record["case_id"],
-            integrity_record["evidence_sha256"],
-            integrity_record["report_sha256"]
-        )
-
-        verification = blockchain_ledger.verify_record(
-            blockchain_record["transaction_hash"],
-            integrity_record["evidence_sha256"],
-            integrity_record["report_sha256"]
-        )
-
-        create_case(
-            integrity_record["case_id"],
-            integrity_record["evidence_sha256"],
-            integrity_record["report_sha256"],
-            blockchain_record["transaction_hash"],
-            blockchain_record["block_number"]
-        )
-
-        result["evidence_integrity"] = {
-            "case_id": integrity_record["case_id"],
-            "evidence_sha256": integrity_record["evidence_sha256"],
-            "report_sha256": integrity_record["report_sha256"],
-            "hash_algorithm": integrity_record["hash_algorithm"],
-            "created_at": integrity_record["created_at"],
-            "blockchain": {
-                "transaction_hash": blockchain_record["transaction_hash"],
-                "block_number": blockchain_record["block_number"],
-                "verification_status": verification["verification_status"],
-                "evidence_match": verification["evidence_match"],
-                "report_match": verification["report_match"]
-            }
-        }
-
-        return result
-
-    except HTTPException:
-        raise
-
-    except Exception as error:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Gmail test-email analysis failed: {str(error)}"
-        )
-
-    finally:
-        if temp_path and os.path.exists(temp_path):
-            os.remove(temp_path)
-# ============================================================
 # MANUAL BLOCKCHAIN INTEGRITY VERIFICATION
 # ============================================================
 
@@ -1036,11 +1035,14 @@ async def verify_evidence(
 
 @app.get("/cases/{case_id}")
 def get_stored_case(
-    case_id: str
+    case_id: str,
+    request: FastAPIRequest
 ):
+    owner_google_sub = get_current_google_sub(request)
 
     case = get_case(
-        case_id
+        case_id,
+        owner_google_sub
     )
 
     if not case:
