@@ -1,16 +1,16 @@
 import json
+import urllib.parse
 import urllib.request
 
 
 def lookup_ip_geolocation(ip):
     """
     Look up approximate geolocation and network information
-    for a public IP address.
-
-    This uses ip-api.com's free HTTP endpoint for development.
+    for a public IP address using ipapi.is.
     """
 
-    url = f"http://ip-api.com/json/{ip}"
+    encoded_ip = urllib.parse.quote(ip, safe="")
+    url = f"https://api.ipapi.is/?q={encoded_ip}"
 
     try:
 
@@ -23,29 +23,18 @@ def lookup_ip_geolocation(ip):
                 response.read().decode("utf-8")
             )
 
-        if data.get("status") != "success":
-
-            return {
-                "ip": ip,
-                "success": False,
-                "error": data.get(
-                    "message",
-                    "Lookup failed"
-                )
-            }
-
         return {
             "ip": ip,
             "success": True,
             "country": data.get("country"),
-            "country_code": data.get("countryCode"),
-            "region": data.get("regionName"),
+            "region": data.get("region"),
             "city": data.get("city"),
             "latitude": data.get("lat"),
             "longitude": data.get("lon"),
-            "isp": data.get("isp"),
-            "organization": data.get("org"),
-            "asn": data.get("as"),
+            "isp": data.get("company"),
+            "organization": data.get("company"),
+            "asn": data.get("asn"),
+            "timezone": data.get("timezone"),
         }
 
     except Exception as error:
