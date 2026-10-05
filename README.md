@@ -585,19 +585,18 @@ Important limitations include:
 
 Potential extensions include:
 
-* Gmail integration
 * Microsoft 365 integration
 * Mail-server/webhook ingestion
 * Real-time threat-intelligence feeds
 * URL reputation services
 * Attachment sandboxing
-* User authentication
-* Case-management workflows
+* Advanced case-management workflows
 * Production database
 * Production blockchain infrastructure
 * Dashboard analytics and visualization
 * Automated alerting
 * Improved ML training and evaluation on diverse real-world datasets
+* Expanded security controls for production deployment
 
 ---
 
@@ -616,9 +615,13 @@ Core development is functional and includes:
 * Forensic case storage
 * Investigation dashboard
 * Tamper-detection testing
+* Gmail OAuth integration
+* User-scoped case access
+* User data deletion controls
+* Privacy policy documentation
+* HTTPS-based IP geolocation enrichment
 
 The project is currently in the **testing, documentation, and presentation-polish phase**.
-
 ---
 
 # Disclaimer
